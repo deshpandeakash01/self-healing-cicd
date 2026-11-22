@@ -55,7 +55,7 @@ agent/              the agent (LangGraph graph, tools, guardrail, GitHub client,
   evaluate.py       scores rules / classifier / LLM / cascade on hand-labelled logs
 clean_and_label.py  log cleaning used by triage (and, originally, dataset labelling)
 data/classifier_logreg_shared_final.joblib   the trained classifier (scikit-learn 1.9.0)
-tests/test_agent.py 41 tests with a stand-in LLM and a stand-in GitHub; no key, no network
+tests/test_agent.py 42 tests with a stand-in LLM and a stand-in GitHub; no key, no network
 tests/fixtures/     four real failed-CI logs the tests use
 test_repo/          the demo repository: code, its CI, the Self-heal workflow, break_it.py
 export_agent_repo.py copies just the agent into its own folder, for the workflow to check out
@@ -69,7 +69,7 @@ Requires Python 3.12+.
 
 ```bash
 pip install -r requirements-agent.txt
-python tests/test_agent.py              # 40 of 40 passed, 1 skipped (needs research data)
+python tests/test_agent.py              # 41 of 41 passed, 1 skipped (needs research data)
 ```
 
 The run commands below need two settings in your environment, never in a file:

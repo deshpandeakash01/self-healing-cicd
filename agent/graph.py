@@ -743,6 +743,38 @@ class Agent:
             lines += [f"- {r}" for r in d["reasons"]]
         return "\n".join(lines)
 
+    def _takeover_comment(self, state: State, outcome: str) -> str:
+        """
+        The note on an open pull request whose fix did not make CI pass and
+        that the agent is giving up on - for whatever reason. Before 23 Nov
+        (log 3.47) only "failed"/"timeout" left a note: a later attempt that
+        escalated, or an LLM that became unavailable, left a red PR with no
+        explanation.
+        """
+        v, p = state.get("verify") or {}, state.get("proposal") or {}
+        if outcome == "error":
+            why = ("the language model became unavailable before the agent "
+                   f"could try again ({state.get('llm_error')})")
+        elif outcome == "escalated":
+            why = "the agent decided a person must handle the remaining failure"
+        elif outcome == "timeout":
+            why = f"the agent could not verify its fix in time ({v.get('note', outcome)})"
+        else:   # failed: the attempt limit was reached
+            why = ("the agent's attempts did not make it pass "
+                   f"({v.get('note', outcome)})")
+        lines = ["**Self-heal has stopped on this pull request. A human needs to take over.**",
+                 "",
+                 f"CI does not pass on this branch yet, and {why}. Nothing more "
+                 "will be changed here. Check the changes listed above as not "
+                 "backed by the CI log first."]
+        if outcome == "escalated" and p.get("root_cause"):
+            lines += ["", f"**Last diagnosis ({p.get('category')}):** {p.get('root_cause')}",
+                      "", str(p.get("explanation") or "").strip()]
+            d = state.get("decision") or {}
+            if not d.get("ok", True) and d.get("reasons"):
+                lines += ["", "**Blocked by the safety rules:**"] + [f"- {r}" for r in d["reasons"]]
+        return "\n".join(lines)
+
     def _retry_comment(self, state: State, edits: list, evidence: list | None = None) -> str:
         p, prev = state["proposal"], state.get("previous") or {}
         return "\n".join([
@@ -922,11 +954,9 @@ class Agent:
                 edits=state["decision"].get("edits", []),
                 cleaned_log=state["triage"]["cleaned_log"])
         pr = state.get("pr")
-        if pr and outcome in ("failed", "timeout") and not self.dry_run:
+        if pr and outcome in ("failed", "timeout", "error", "escalated") and not self.dry_run:
             try:        # leave a note for the human who finds the open PR
-                self.gh.comment(pr["number"],
-                                "Self-heal could not verify this fix "
-                                f"({v.get('note', outcome)}). A human needs to take over.")
+                self.gh.comment(pr["number"], self._takeover_comment(state, outcome))
             except (GitHubError, ReadOnlyError):
                 pass
         notified = None

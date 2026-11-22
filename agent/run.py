@@ -91,6 +91,20 @@ def run_with_fallback(start, models: list, retries: int, wait: float,
 def error_comment(state: dict, repo: str) -> str:
     inc = state.get("incident") or {}
     run_id = inc.get("run_id", state.get("run_id"))
+    pr = state.get("pr")
+    if pr:
+        # An earlier attempt already changed something (log 3.47): never
+        # say "nothing was changed" then.
+        return "\n".join([
+            "**Self-heal stopped before this failure was fixed.**",
+            "",
+            f"Run [{run_id}](https://github.com/{repo}/actions/runs/{run_id}) failed. "
+            f"The agent opened [pull request #{pr.get('number')}]({pr.get('url')}), "
+            "but CI does not pass on it yet, and the language model became "
+            "unavailable before a second attempt. A human needs to take over.",
+            "",
+            f"Reason: {state.get('llm_error')}",
+        ])
     return "\n".join([
         "**Self-heal could not look at this failure.**",
         "",

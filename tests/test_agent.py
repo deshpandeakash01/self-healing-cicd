@@ -399,7 +399,8 @@ def test_gives_up_after_the_attempt_limit(tmp):
     assert len(s["attempts"]) == config.MAX_FIX_ATTEMPTS
     # one comment explaining the second commit, then the hand-over to a human
     assert len(gh.comments) == 2 and "attempt 2" in gh.comments[0]
-    assert "could not verify" in gh.comments[-1]
+    assert "attempts did not make it pass" in gh.comments[-1]
+    assert "A human needs to take over" in gh.comments[-1]
     assert not config.FIX_MEMORY.exists()
 
 
@@ -581,6 +582,33 @@ def test_pull_request_lists_changes_the_log_does_not_show(tmp):
     s = Agent(ScriptedLLM(fix_script()), gh, dry_run=False, verbose=False).run(
         repo="o/r", run_id=100, job_id=1)
     assert "None of the changes in this commit is tied to a line" in gh.prs[0]["body"]
+
+
+
+def test_a_red_pull_request_is_never_left_without_a_note(tmp):
+    """3.47: attempt 1's fix fails CI, then the LLM runs out of quota."""
+    from agent.run import error_comment
+
+    def boom(messages):
+        raise QUOTA_ERROR
+    gh = FakeGitHub(FILES, [job(1, LOG_TEST)], ci=passes)
+    s = Agent(ScriptedLLM(fix_script(STILL_WRONG) + [boom]), gh, dry_run=False,
+              verbose=False).run(repo="o/r", run_id=100, job_id=1)
+    assert s["outcome"] == "error" and s["pr"]
+    note = gh.comments[-1]
+    assert "A human needs to take over" in note and "unavailable" in note
+    text = error_comment(s, "o/r")
+    assert "pull request #1" in text and "nothing was changed" not in text
+    assert "nothing was changed" in error_comment(dict(s, pr=None), "o/r")
+    # a later attempt that ESCALATES also leaves a note, with its diagnosis
+    give_up = call("submit_diagnosis", category="other", root_cause="unclear now",
+                   action="escalate", explanation="cannot tell")
+    gh = FakeGitHub(FILES, [job(1, LOG_TEST)], ci=passes)
+    s = Agent(ScriptedLLM(fix_script(STILL_WRONG) + [give_up]), gh, dry_run=False,
+              verbose=False).run(repo="o/r", run_id=100, job_id=1)
+    assert s["outcome"] == "escalated"
+    assert "decided a person must handle" in gh.comments[-1]
+    assert "unclear now" in gh.comments[-1]
 
 
 def test_github_client_commits_several_files_at_once(tmp):
