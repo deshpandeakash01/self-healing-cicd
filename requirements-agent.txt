@@ -1,0 +1,18 @@
+# Packages the agent needs. Install with:
+#     pip install -r requirements-agent.txt
+#
+# Versions are the ones the agent was built and tested against (13 Nov 2026).
+
+# The saved classifier was written with scikit-learn 1.9.0. Loading it with a
+# different version prints a warning and is not guaranteed to work.
+scikit-learn==1.9.0
+joblib
+
+langgraph>=1.2
+langchain-core>=1.8
+langchain-google-genai>=4.5
+pydantic>=2
+requests
+
+# Only for running tests\test_agent.py through pytest (optional).
+pytest

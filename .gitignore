@@ -1,0 +1,35 @@
+# ALLOW-LIST: everything is ignored except what is listed below with "!".
+# This keeps the 200+ MB dataset, the labelled data, the research scripts,
+# run records and the working log out of the repository even if someone
+# runs "git add -A". To publish a new file, add a "!" line for it here.
+
+# 1. Ignore everything at the top level ...
+/*
+
+# 2. ... except these.
+!/.gitignore
+!/README.md
+!/requirements-agent.txt
+!/clean_and_label.py
+!/export_agent_repo.py
+!/agent/
+!/tests/
+!/test_repo/
+
+# The trained classifier the agent uses (0.3 MB). Nothing else from data/.
+!/data/
+/data/*
+!/data/classifier_logreg_shared_final.joblib
+
+# 3. Never, anywhere.
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+.env
+*.env
+.vscode/
+.idea/
+*.log

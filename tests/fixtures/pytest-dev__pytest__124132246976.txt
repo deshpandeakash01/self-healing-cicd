@@ -1,0 +1,70 @@
+﻿2026-10-30T14:55:54.0119486Z Current runner version: '2.338.2'
+2026-10-30T14:55:54.0145672Z ##[group]Runner Image Provisioner
+2026-10-30T14:55:54.0146655Z Hosted Compute Agent
+2026-10-30T14:55:54.0147271Z Version: 20261021.618
+2026-10-30T14:55:54.0147963Z Commit: 21505ad2541d5be6135ed84fc33697146cf75b8e
+2026-10-30T14:55:54.0148702Z Build Date: 2026-10-21T00:45:21Z
+2026-10-30T14:55:54.0149461Z Worker ID: {4b1493f6-a23f-433a-9832-6dc0bc97eb1f}
+2026-10-30T14:55:54.0150252Z Region: southcentralus
+2026-10-30T14:55:54.0150832Z Cloud: Azure
+2026-10-30T14:55:54.0151573Z ##[endgroup]
+2026-10-30T14:55:54.0154236Z ##[group]Operating System
+2026-10-30T14:55:54.0154932Z Ubuntu
+2026-10-30T14:55:54.0155549Z 26.04.1
+2026-10-30T14:55:54.0156073Z LTS
+2026-10-30T14:55:54.0156568Z ##[endgroup]
+2026-10-30T14:55:54.0157195Z ##[group]Runner Image
+2026-10-30T14:55:54.0157815Z Image: ubuntu-26.04
+2026-10-30T14:55:54.0158394Z Version: 20261025.179.1
+2026-10-30T14:55:54.0159697Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261025.179/images/ubuntu/Ubuntu2604-Readme.md
+2026-10-30T14:55:54.0161334Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261025.179
+2026-10-30T14:55:54.0162363Z ##[endgroup]
+2026-10-30T14:55:54.0163871Z ##[group]GITHUB_TOKEN Permissions
+2026-10-30T14:55:54.0166128Z Metadata: read
+2026-10-30T14:55:54.0166807Z ##[endgroup]
+2026-10-30T14:55:54.0169178Z Secret source: None
+2026-10-30T14:55:54.0170329Z Cache mode: write
+2026-10-30T14:55:54.0171285Z Prepare workflow directory
+2026-10-30T14:55:54.0590728Z Prepare all required actions
+2026-10-30T14:55:54.0644127Z Getting action download info
+2026-10-30T14:55:54.3511186Z Download action repository 're-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35' (SHA:b5b5b37504aa4183270bd3d855c52a67f212be35)
+2026-10-30T14:55:54.7637070Z Complete job name: check
+2026-10-30T14:55:54.8482546Z ##[group]Run re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35
+2026-10-30T14:55:54.8483992Z with:
+2026-10-30T14:55:54.8484576Z   jobs: {
+  "build": {
+    "result": "failure",
+    "outputs": {}
+  }
+}
+2026-10-30T14:55:54.8485306Z   allowed-failures: []
+2026-10-30T14:55:54.8485784Z   allowed-skips: []
+2026-10-30T14:55:54.8486439Z env:
+2026-10-30T14:55:54.8486910Z   PYTEST_ADDOPTS: --color=yes
+2026-10-30T14:55:54.8487433Z ##[endgroup]
+2026-10-30T14:55:54.8582462Z ##[start-action display=Decide whether the input jobs succeeded or failed;id=__re-actors_alls-green.outcome]
+2026-10-30T14:55:54.8636181Z ##[group]Run python -m normalize_needed_jobs_status \
+2026-10-30T14:55:54.8636978Z [36;1mpython -m normalize_needed_jobs_status \[0m
+2026-10-30T14:55:54.8637649Z [36;1m  "$INPUT_ALLOWED_FAILURES" \[0m
+2026-10-30T14:55:54.8638237Z [36;1m  "$INPUT_ALLOWED_SKIPS" \[0m
+2026-10-30T14:55:54.8638792Z [36;1m  "$INPUT_JOBS"[0m
+2026-10-30T14:55:54.8671962Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-30T14:55:54.8672660Z env:
+2026-10-30T14:55:54.8673304Z   PYTEST_ADDOPTS: --color=yes
+2026-10-30T14:55:54.8673840Z   INPUT_ALLOWED_FAILURES: []
+2026-10-30T14:55:54.8674364Z   INPUT_ALLOWED_SKIPS: []
+2026-10-30T14:55:54.8675008Z   INPUT_JOBS: {
+  "build": {
+    "result": "failure",
+    "outputs": {}
+  }
+}
+2026-10-30T14:55:54.8676112Z   PYTHONPATH: /home/runner/work/_actions/re-actors/alls-green/b5b5b37504aa4183270bd3d855c52a67f212be35/src
+2026-10-30T14:55:54.8677058Z ##[endgroup]
+2026-10-30T14:55:54.9159155Z # ❌ Some of the required to succeed jobs failed 😢😢😢
+2026-10-30T14:55:54.9159803Z 
+2026-10-30T14:55:54.9160128Z 🔮 Job statuses:
+2026-10-30T14:55:54.9161198Z [31m❌ build → 🔴 failure [required to succeed][0m
+2026-10-30T14:55:54.9217543Z ##[error]Process completed with exit code 1.
+2026-10-30T14:55:54.9310266Z ##[end-action id=__re-actors_alls-green.outcome;outcome=failure;conclusion=failure;duration_ms=72]
+2026-10-30T14:55:54.9449337Z Cleaning up orphan processes

@@ -1,0 +1,554 @@
+﻿2026-10-26T09:24:38.5841593Z Current runner version: '2.338.0'
+2026-10-26T09:24:38.5889711Z ##[group]Runner Image Provisioner
+2026-10-26T09:24:38.5890622Z Hosted Compute Agent
+2026-10-26T09:24:38.5891337Z Version: 20261021.618
+2026-10-26T09:24:38.5891977Z Commit: 21505ad2541d5be6135ed84fc33697146cf75b8e
+2026-10-26T09:24:38.5892677Z Build Date: 2026-10-21T00:45:21Z
+2026-10-26T09:24:38.5893463Z Worker ID: {c6aca87f-100d-4286-a5b0-2de6e626f2b3}
+2026-10-26T09:24:38.5894191Z Region: chilecentral
+2026-10-26T09:24:38.5894792Z Cloud: Azure
+2026-10-26T09:24:38.5895342Z ##[endgroup]
+2026-10-26T09:24:38.5896780Z ##[group]Operating System
+2026-10-26T09:24:38.5897516Z Ubuntu
+2026-10-26T09:24:38.5898082Z 24.04.5
+2026-10-26T09:24:38.5898930Z LTS
+2026-10-26T09:24:38.5899470Z ##[endgroup]
+2026-10-26T09:24:38.5900022Z ##[group]Runner Image
+2026-10-26T09:24:38.5900700Z Image: ubuntu-24.04
+2026-10-26T09:24:38.5901271Z Version: 20261012.334.1
+2026-10-26T09:24:38.5902567Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261012.334/images/ubuntu/Ubuntu2404-Readme.md
+2026-10-26T09:24:38.5904138Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261012.334
+2026-10-26T09:24:38.5905183Z ##[endgroup]
+2026-10-26T09:24:38.5906401Z ##[group]GITHUB_TOKEN Permissions
+2026-10-26T09:24:38.5908521Z Contents: read
+2026-10-26T09:24:38.5909187Z Metadata: read
+2026-10-26T09:24:38.5909740Z PullRequests: read
+2026-10-26T09:24:38.5910441Z ##[endgroup]
+2026-10-26T09:24:38.5912486Z Secret source: Actions
+2026-10-26T09:24:38.5913532Z Cache mode: read
+2026-10-26T09:24:38.5914219Z Prepare workflow directory
+2026-10-26T09:24:38.6250643Z Prepare all required actions
+2026-10-26T09:24:38.6299198Z Getting action download info
+2026-10-26T09:24:39.1966857Z Download action repository 'actions/github-script@v9' (SHA:3a2844b7e9c422d3c10d287c895573f7108da1b3)
+2026-10-26T09:24:40.0301529Z Download action repository 'elastic/docs-builder@main' (SHA:e52c426a6f878c3bda19811634b10c9bc45a5fab)
+2026-10-26T09:24:42.0766134Z Download action repository 'elastic/ci-gh-actions@v1.5.3' (SHA:2feb1c6f5086cf8e06f61ef35e275abed3456f7b)
+2026-10-26T09:24:42.6647456Z Download action repository 'elastic/docs-actions@v1' (SHA:754d9a1d528c59100d4e0a4653e2e4beaa2e9fd5)
+2026-10-26T09:24:43.5869930Z Getting action download info
+2026-10-26T09:24:43.7694527Z Download action repository 'elastic/ci-gh-actions@622f9dc1eecdd4af2e81dfb38028aacb1dae03e8' (SHA:622f9dc1eecdd4af2e81dfb38028aacb1dae03e8)
+2026-10-26T09:24:44.4507779Z Getting action download info
+2026-10-26T09:24:44.6543325Z Uses: elastic/docs-actions/.github/workflows/docs-deploy.yml@refs/tags/v1 (754d9a1d528c59100d4e0a4653e2e4beaa2e9fd5)
+2026-10-26T09:24:44.6547317Z ##[group] Inputs
+2026-10-26T09:24:44.6547594Z   strict: true
+2026-10-26T09:24:44.6547829Z   continue-on-error: false
+2026-10-26T09:24:44.6548085Z   path-pattern: docs/**
+2026-10-26T09:24:44.6548726Z   path-pattern-ignore: docs/changelog/**/*.yaml
+2026-10-26T09:24:44.6549464Z   disable-comments: false
+2026-10-26T09:24:44.6549764Z   enable-cumulative-comment: true
+2026-10-26T09:24:44.6550046Z   enable-vale-linting: true
+2026-10-26T09:24:44.6550452Z   vale-paths: docs/reference/**
+docs/extend/**
+!docs/reference/query-languages/esql/**
+
+2026-10-26T09:24:44.6550883Z   path: 
+2026-10-26T09:24:44.6551085Z   use-release-branches: false
+2026-10-26T09:24:44.6551342Z ##[endgroup]
+2026-10-26T09:24:44.6551561Z Complete job name: deploy / preflight
+2026-10-26T09:24:44.7091816Z ##[group]Pull down action image 'ghcr.io/elastic/docs-builder:edge'
+2026-10-26T09:24:44.7194723Z ##[command]/usr/bin/docker pull ghcr.io/elastic/docs-builder:edge
+2026-10-26T09:24:46.1591217Z edge: Pulling from elastic/docs-builder
+2026-10-26T09:24:46.1591790Z c8298438a7c3: Pulling fs layer
+2026-10-26T09:24:46.1592262Z 54ae0535a699: Pulling fs layer
+2026-10-26T09:24:46.1592712Z de3d578ba8b8: Pulling fs layer
+2026-10-26T09:24:46.7662788Z 54ae0535a699: Verifying Checksum
+2026-10-26T09:24:46.7663173Z 54ae0535a699: Download complete
+2026-10-26T09:24:47.3648978Z c8298438a7c3: Verifying Checksum
+2026-10-26T09:24:47.3650476Z c8298438a7c3: Download complete
+2026-10-26T09:24:47.4511048Z c8298438a7c3: Pull complete
+2026-10-26T09:24:47.4964639Z 54ae0535a699: Pull complete
+2026-10-26T09:24:48.2076147Z de3d578ba8b8: Verifying Checksum
+2026-10-26T09:24:48.2076834Z de3d578ba8b8: Download complete
+2026-10-26T09:24:48.5784811Z de3d578ba8b8: Pull complete
+2026-10-26T09:24:48.5816416Z Digest: sha256:119586571cc62692ae2963558344b5408b72c771d491863b32dada4a05f3bf03
+2026-10-26T09:24:48.5831652Z Status: Downloaded newer image for ghcr.io/elastic/docs-builder:edge
+2026-10-26T09:24:48.5843353Z ghcr.io/elastic/docs-builder:edge
+2026-10-26T09:24:48.5872417Z ##[endgroup]
+2026-10-26T09:24:48.6181215Z ##[group]Run actions/github-script@v9
+2026-10-26T09:24:48.6181819Z with:
+2026-10-26T09:24:48.6199208Z   script: const run = context.payload.workflow_run;
+const event = run.event;
+const headSha = run.head_sha;
+const headBranch = run.head_branch;
+const headRepo = run.head_repository.full_name;
+const { owner, repo } = context.repo;
+const isFork = headRepo !== `${owner}/${repo}`;
+
+core.setOutput('event', event);
+core.setOutput('head-sha', headSha);
+core.setOutput('head-branch', headBranch);
+core.setOutput('head-repo', headRepo);
+core.setOutput('is-fork', isFork ? 'true' : 'false');
+
+const pathPattern = process.env.PATH_PATTERN || '**';
+const ignoreLines = (process.env.IGNORE_PATTERNS || '')
+  .split('\n').map(s => s.trim()).filter(Boolean);
+
+// No checkout in this workflow_run phase, so patterns are matched
+// against API filenames: dir/** (subtree), dir/* (direct children), exact.
+const matchesGlob = (f, pattern) => {
+  if (pattern.endsWith('/**')) return f.startsWith(pattern.slice(0, -3) + '/');
+  if (pattern.endsWith('/*')) {
+    const dir = pattern.slice(0, -2);
+    return f.startsWith(dir + '/') && !f.slice(dir.length + 1).includes('/');
+  }
+  return f === pattern;
+};
+
+// Fails open: any pattern shape other than dir/** matches everything.
+const matchesPattern = (filename) =>
+  !pathPattern.endsWith('/**') || matchesGlob(filename, pathPattern);
+
+const isIgnored = (filename) => ignoreLines.some(p => matchesGlob(filename, p));
+
+if (event === 'push') {
+  core.setOutput('base-ref', headBranch);
+  core.setOutput('vale-files-match', 'false');
+
+  let hasChanges = 'true';
+  try {
+    const { data: commit } = await github.rest.repos.getCommit({
+      owner, repo, ref: headSha,
+    });
+    const commitFiles = commit.files || [];
+    // GitHub caps getCommit file list at 300; if truncated, default to has-changes=true.
+    if (commitFiles.length >= 300) {
+      core.warning('Commit has ≥300 files — change detection truncated, defaulting to has-changes=true');
+    } else {
+      hasChanges = commitFiles.some(f => matchesPattern(f.filename) && !isIgnored(f.filename)) ? 'true' : 'false';
+      core.info(`Push has-changes (commit diff): ${hasChanges}`);
+
+      // Release-branch opt-in parity: a freshly-cut semver branch shares its
+      // HEAD with the default branch (no diff) but still needs a build so
+      // links.json is produced for the link index.
+      const useRelease = process.env.USE_RELEASE_BRANCHES === 'true';
+      const defaultBranch = process.env.DEFAULT_BRANCH;
+      if (hasChanges === 'false' && useRelease && headBranch !== defaultBranch && /^[0-9]+\.[0-9]+(\.[0-9]+)?$/.test(headBranch)) {
+        const cmp = await github.rest.repos.compareCommitsWithBasehead({
+          owner, repo, basehead: `${defaultBranch}...${headSha}`,
+        });
+        if (cmp.data.ahead_by === 0) {
+          hasChanges = 'true';
+          core.info('Release-branch opt-in: freshly-cut semver branch — forcing has-changes=true');
+        }
+      }
+    }
+  } catch (err) {
+    core.warning(`Push change detection failed: ${err.message} — defaulting to has-changes=true`);
+  }
+
+  core.setOutput('has-changes', hasChanges);
+  return;
+}
+
+if (event !== 'pull_request') {
+  core.info(`Event '${event}' is not deployable — skipping`);
+  core.setOutput('has-changes', 'false');
+  core.setOutput('vale-files-match', 'false');
+  return;
+}
+
+// --- PR resolution ---
+let prNumber;
+if (run.pull_requests?.length > 0) {
+  prNumber = run.pull_requests[0].number;
+  core.info(`Resolved PR #${prNumber} from workflow_run.pull_requests`);
+} else {
+  const headLabel = `${run.head_repository.owner.login}:${headBranch}`;
+  const { data: prs } = await github.rest.pulls.list({
+    owner, repo, state: 'open', head: headLabel
+  });
+  const match = prs.find(pr => pr.head.sha === headSha);
+  if (match) {
+    prNumber = match.number;
+    core.info(`Resolved PR #${prNumber} via pulls.list fallback`);
+  }
+}
+
+if (!prNumber) {
+  core.warning('Could not resolve PR number — skipping deployment');
+  core.setOutput('has-changes', 'false');
+  core.setOutput('vale-files-match', 'false');
+  return;
+}
+
+core.setOutput('pr-number', prNumber);
+
+const { data: pr } = await github.rest.pulls.get({
+  owner, repo, pull_number: prNumber
+});
+core.setOutput('base-ref', pr.base.ref);
+core.setOutput('pr-author', pr.user.login);
+
+// --- Changed-files check (docs-relevant files only) ---
+const files = await github.paginate(github.rest.pulls.listFiles, {
+  owner, repo, pull_number: prNumber
+});
+
+const hasChanges = files.some(f => matchesPattern(f.filename) && !isIgnored(f.filename));
+core.setOutput('has-changes', hasChanges ? 'true' : 'false');
+
+// --- Vale files check (vale-paths filtering) ---
+const valePathLines = (process.env.VALE_PATHS || '')
+  .split('\n').map(s => s.trim()).filter(Boolean);
+
+let valeFilesMatch;
+if (valePathLines.length === 0) {
+  valeFilesMatch = hasChanges;
+} else {
+  const valeIncludes = valePathLines.filter(p => !p.startsWith('!'));
+  const valeExcludes = valePathLines.filter(p => p.startsWith('!')).map(p => p.slice(1));
+  const matchesVale = (filename) => {
+    const included = valeIncludes.length === 0 || valeIncludes.some(p => matchesGlob(filename, p));
+    const excluded = valeExcludes.some(p => matchesGlob(filename, p));
+    return included && !excluded;
+  };
+  valeFilesMatch = files.some(f => matchesVale(f.filename) && !isIgnored(f.filename));
+}
+core.setOutput('vale-files-match', valeFilesMatch ? 'true' : 'false');
+
+2026-10-26T09:24:48.6218830Z   github-token: ***
+2026-10-26T09:24:48.6219053Z   debug: false
+2026-10-26T09:24:48.6219266Z   user-agent: actions/github-script
+2026-10-26T09:24:48.6219535Z   result-encoding: json
+2026-10-26T09:24:48.6219749Z   retries: 0
+2026-10-26T09:24:48.6219977Z   retry-exempt-status-codes: 400,401,403,404,422
+2026-10-26T09:24:48.6220632Z env:
+2026-10-26T09:24:48.6220840Z   PATH_PATTERN: docs/**
+2026-10-26T09:24:48.6221161Z   IGNORE_PATTERNS: docs/changelog/**/*.yaml
+.github/**
+README.md
+
+2026-10-26T09:24:48.6221665Z   VALE_PATHS: docs/reference/**
+docs/extend/**
+!docs/reference/query-languages/esql/**
+
+2026-10-26T09:24:48.6222091Z   USE_RELEASE_BRANCHES: false
+2026-10-26T09:24:48.6222331Z   DEFAULT_BRANCH: main
+2026-10-26T09:24:48.6222549Z ##[endgroup]
+2026-10-26T09:24:49.3307744Z Resolved PR #163214 via pulls.list fallback
+2026-10-26T09:24:51.2614745Z ##[group]Run elastic/ci-gh-actions/fetch-github-token@v1.5.3
+2026-10-26T09:24:51.2615399Z with:
+2026-10-26T09:24:51.2615740Z   vault-instance: ci-prod
+2026-10-26T09:24:51.2616243Z   vault-role: token-policy-8c6a5ed19135
+2026-10-26T09:24:51.2616789Z   skip-token-revoke: true
+2026-10-26T09:24:51.2617179Z ##[endgroup]
+2026-10-26T09:24:51.2681741Z ##[start-action display=Set Vault Address;id=fetch-ephemeral-token.vault-address]
+2026-10-26T09:24:51.2716799Z ##[group]Run set -euo pipefail
+2026-10-26T09:24:51.2717222Z [36;1mset -euo pipefail[0m
+2026-10-26T09:24:51.2717463Z [36;1m[0m
+2026-10-26T09:24:51.2717709Z [36;1mif [[ "$VAULT_INSTANCE" == "ci-dev" ]]; then[0m
+2026-10-26T09:24:51.2718143Z [36;1m  echo "url=https://vault-ci.dev.elastic.dev" >> "$GITHUB_OUTPUT"[0m
+2026-10-26T09:24:51.2718941Z [36;1m  echo "Vault address set to CI-DEV."[0m
+2026-10-26T09:24:51.2719287Z [36;1melif [[ "$VAULT_INSTANCE" == "ci-prod" ]]; then[0m
+2026-10-26T09:24:51.2719770Z [36;1m  echo "url=https://vault-ci-prod.elastic.dev" >> "$GITHUB_OUTPUT"[0m
+2026-10-26T09:24:51.2720200Z [36;1m  echo "Vault address set to CI-PROD."[0m
+2026-10-26T09:24:51.2720690Z [36;1melse[0m
+2026-10-26T09:24:51.2721185Z [36;1m  echo "::error title=Input Validation Failed::Invalid vault instance: $VAULT_INSTANCE. Must be 'ci-dev' or 'ci-prod'."[0m
+2026-10-26T09:24:51.2721741Z [36;1m  exit 1[0m
+2026-10-26T09:24:51.2721936Z [36;1mfi[0m
+2026-10-26T09:24:51.2936154Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-26T09:24:51.2936515Z env:
+2026-10-26T09:24:51.2936710Z   VAULT_INSTANCE: ci-prod
+2026-10-26T09:24:51.2936945Z ##[endgroup]
+2026-10-26T09:24:51.3037216Z Vault address set to CI-PROD.
+2026-10-26T09:24:51.3052842Z ##[end-action id=fetch-ephemeral-token.vault-address;outcome=success;conclusion=success;duration_ms=37]
+2026-10-26T09:24:51.3055751Z ##[start-action display=Retrieve GitHub Workflow Ref and generate Vault Role name (vault-role input overrides this if provided);id=fetch-ephemeral-token.vault-role]
+2026-10-26T09:24:51.3061222Z ##[end-action id=fetch-ephemeral-token.vault-role;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-10-26T09:24:51.3064790Z ##[start-action display=Diagnostic: Log Final Vault Parameters;id=fetch-ephemeral-token.__run]
+2026-10-26T09:24:51.3082536Z ##[group]Run echo "--- Vault Action Input Parameters ---"
+2026-10-26T09:24:51.3082957Z [36;1mecho "--- Vault Action Input Parameters ---"[0m
+2026-10-26T09:24:51.3083304Z [36;1mecho "VAULT_ADDR (URL): $VAULT_ADDR"[0m
+2026-10-26T09:24:51.3083617Z [36;1mecho "VAULT_ROLE: $VAULT_ROLE"[0m
+2026-10-26T09:24:51.3084073Z [36;1mecho "Vault Secrets Path Expected: github/token/$VAULT_ROLE"[0m
+2026-10-26T09:24:51.3084508Z [36;1mecho "-------------------------------------"[0m
+2026-10-26T09:24:51.3142956Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-26T09:24:51.3143307Z env:
+2026-10-26T09:24:51.3143561Z   VAULT_ADDR: https://vault-ci-prod.elastic.dev
+2026-10-26T09:24:51.3143910Z   VAULT_ROLE: token-policy-8c6a5ed19135
+2026-10-26T09:24:51.3144180Z ##[endgroup]
+2026-10-26T09:24:51.3218850Z --- Vault Action Input Parameters ---
+2026-10-26T09:24:51.3219492Z VAULT_ADDR (URL): https://vault-ci-prod.elastic.dev
+2026-10-26T09:24:51.3220019Z VAULT_ROLE: token-policy-8c6a5ed19135
+2026-10-26T09:24:51.3220561Z Vault Secrets Path Expected: github/token/token-policy-8c6a5ed19135
+2026-10-26T09:24:51.3221442Z -------------------------------------
+2026-10-26T09:24:51.3228839Z ##[end-action id=fetch-ephemeral-token.__run;outcome=success;conclusion=success;duration_ms=16]
+2026-10-26T09:24:51.3231309Z ##[start-action display=Verify GitHub OIDC (id-token) is available;id=fetch-ephemeral-token.__run_2]
+2026-10-26T09:24:51.3248902Z ##[group]Run set -euo pipefail
+2026-10-26T09:24:51.3249212Z [36;1mset -euo pipefail[0m
+2026-10-26T09:24:51.3249652Z [36;1mif [[ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" || -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then[0m
+2026-10-26T09:24:51.3250848Z [36;1m  echo "::error title=Missing id-token permission::GitHub did not expose the OIDC token endpoint for this job. Add job permissions so Actions can mint an OIDC JWT:%0A%0Apermissions:%0A  id-token: write%0A"[0m
+2026-10-26T09:24:51.3251699Z [36;1m  exit 1[0m
+2026-10-26T09:24:51.3251901Z [36;1mfi[0m
+2026-10-26T09:24:51.3304339Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-26T09:24:51.3304691Z ##[endgroup]
+2026-10-26T09:24:51.3383755Z ##[end-action id=fetch-ephemeral-token.__run_2;outcome=success;conclusion=success;duration_ms=15]
+2026-10-26T09:24:51.3385960Z ##[start-action display=Install Vault CLI;id=fetch-ephemeral-token.__run_3]
+2026-10-26T09:24:51.3402996Z ##[group]Run OS=$(uname | tr '[:upper:]' '[:lower:]')
+2026-10-26T09:24:51.3403373Z [36;1mOS=$(uname | tr '[:upper:]' '[:lower:]')[0m
+2026-10-26T09:24:51.3403686Z [36;1mARCH=$(uname -m)[0m
+2026-10-26T09:24:51.3403909Z [36;1m[0m
+2026-10-26T09:24:51.3404156Z [36;1m# Map architecture names to HashiCorp's naming[0m
+2026-10-26T09:24:51.3404481Z [36;1mcase "$ARCH" in[0m
+2026-10-26T09:24:51.3404719Z [36;1m  x86_64) VAULT_ARCH="amd64" ;;[0m
+2026-10-26T09:24:51.3405016Z [36;1m  arm64|aarch64) VAULT_ARCH="arm64" ;;[0m
+2026-10-26T09:24:51.3405456Z [36;1m  *)[0m
+2026-10-26T09:24:51.3405823Z [36;1m    echo "::error title=Unsupported architecture::Architecture $ARCH is not supported"[0m
+2026-10-26T09:24:51.3406257Z [36;1m    exit 1[0m
+2026-10-26T09:24:51.3406462Z [36;1m    ;;[0m
+2026-10-26T09:24:51.3406647Z [36;1mesac[0m
+2026-10-26T09:24:51.3406833Z [36;1m[0m
+2026-10-26T09:24:51.3407051Z [36;1m# Map OS names to HashiCorp's naming[0m
+2026-10-26T09:24:51.3407347Z [36;1mcase "$OS" in[0m
+2026-10-26T09:24:51.3407578Z [36;1m  linux)[0m
+2026-10-26T09:24:51.3407784Z [36;1m    VAULT_OS="linux"[0m
+2026-10-26T09:24:51.3408013Z [36;1m    ;;[0m
+2026-10-26T09:24:51.3408528Z [36;1m  darwin)[0m
+2026-10-26T09:24:51.3408758Z [36;1m    VAULT_OS="darwin"[0m
+2026-10-26T09:24:51.3408993Z [36;1m    ;;[0m
+2026-10-26T09:24:51.3409192Z [36;1m  *)[0m
+2026-10-26T09:24:51.3409536Z [36;1m    echo "::error title=Unsupported OS::Operating system $OS is not supported"[0m
+2026-10-26T09:24:51.3409945Z [36;1m    exit 1[0m
+2026-10-26T09:24:51.3410147Z [36;1m    ;;[0m
+2026-10-26T09:24:51.3410335Z [36;1mesac[0m
+2026-10-26T09:24:51.3410723Z [36;1mecho "Detected OS: $OS, Architecture: $ARCH, using Vault binary for: ${VAULT_OS}_${VAULT_ARCH}"[0m
+2026-10-26T09:24:51.3411201Z [36;1mVAULT_PATH=$RUNNER_TEMP/vault[0m
+2026-10-26T09:24:51.3411481Z [36;1mmkdir -p "$VAULT_PATH"[0m
+2026-10-26T09:24:51.3412123Z [36;1mcurl -fsSL "https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION}_${VAULT_OS}_${VAULT_ARCH}.zip" -o $VAULT_PATH/vault.zip[0m
+2026-10-26T09:24:51.3412796Z [36;1mcd "$VAULT_PATH"[0m
+2026-10-26T09:24:51.3413047Z [36;1munzip vault.zip && rm vault.zip[0m
+2026-10-26T09:24:51.3413322Z [36;1mchmod +x vault[0m
+2026-10-26T09:24:51.3413555Z [36;1m./vault --version[0m
+2026-10-26T09:24:51.3413811Z [36;1mecho "$VAULT_PATH" >> "$GITHUB_PATH"[0m
+2026-10-26T09:24:51.3466592Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-26T09:24:51.3466942Z env:
+2026-10-26T09:24:51.3467145Z   VAULT_VERSION: 1.20.4
+2026-10-26T09:24:51.3467375Z ##[endgroup]
+2026-10-26T09:24:51.3566068Z Detected OS: linux, Architecture: x86_64, using Vault binary for: linux_amd64
+2026-10-26T09:24:56.9344232Z Archive:  vault.zip
+2026-10-26T09:24:59.8163826Z   inflating: vault                   
+2026-10-26T09:24:59.8164538Z   inflating: LICENSE.txt             
+2026-10-26T09:24:59.8817724Z Vault v1.20.4 (55bd8f18c6c84aa89fdede4850a622c57f03bd7e), built 2025-09-23T13:22:38Z
+2026-10-26T09:24:59.8830526Z ##[end-action id=fetch-ephemeral-token.__run_3;outcome=success;conclusion=success;duration_ms=8544]
+2026-10-26T09:24:59.8833658Z ##[start-action display=Request OIDC Token from GitHub;id=fetch-ephemeral-token.__run_4]
+2026-10-26T09:24:59.8853846Z ##[group]Run set -euo pipefail
+2026-10-26T09:24:59.8854197Z [36;1mset -euo pipefail[0m
+2026-10-26T09:24:59.8854690Z [36;1mOIDC_TOKEN=$(curl -s --max-time 10 \[0m
+2026-10-26T09:24:59.8855363Z [36;1m  -H "Authorization: ***" \[0m
+2026-10-26T09:24:59.8855800Z [36;1m  "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=vault" | jq -r '.value') || true[0m
+2026-10-26T09:24:59.8856311Z [36;1mif [[ -z "$OIDC_TOKEN" || "$OIDC_TOKEN" == "null" ]]; then[0m
+2026-10-26T09:24:59.8857264Z [36;1m  echo "::error title=OIDC token request failed::Could not obtain an OIDC JWT from GitHub. Ensure the job has 'permissions.id-token: write' and that this repository allows OIDC (same as other official OIDC actions)."[0m
+2026-10-26T09:24:59.8858426Z [36;1m  exit 1[0m
+2026-10-26T09:24:59.8858847Z [36;1mfi[0m
+2026-10-26T09:24:59.8859142Z [36;1mecho "OIDC_TOKEN=$OIDC_TOKEN" >> "$GITHUB_ENV"[0m
+2026-10-26T09:24:59.8921388Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-26T09:24:59.8921781Z ##[endgroup]
+2026-10-26T09:25:00.3181192Z ##[end-action id=fetch-ephemeral-token.__run_4;outcome=success;conclusion=success;duration_ms=434]
+2026-10-26T09:25:00.3186264Z ##[start-action display=Fetch GitHub Token from Vault with Retry;id=fetch-ephemeral-token.vault-action]
+2026-10-26T09:25:00.3205261Z ##[group]Run set -euo pipefail
+2026-10-26T09:25:00.3205767Z [36;1mset -euo pipefail[0m
+2026-10-26T09:25:00.3205999Z [36;1m[0m
+2026-10-26T09:25:00.3206189Z [36;1mGITHUB_TOKEN=""[0m
+2026-10-26T09:25:00.3206426Z [36;1mHAS_VAULT_LEASE=false[0m
+2026-10-26T09:25:00.3206668Z [36;1mMAX_RETRIES=5[0m
+2026-10-26T09:25:00.3206908Z [36;1mfor i in $(seq 1 $MAX_RETRIES); do[0m
+2026-10-26T09:25:00.3207227Z [36;1m  echo "::group::Attempt $i/$MAX_RETRIES"[0m
+2026-10-26T09:25:00.3207509Z [36;1m[0m
+2026-10-26T09:25:00.3207780Z [36;1m  LOGIN_RESPONSE=$(curl -s --max-time 15 --request POST \[0m
+2026-10-26T09:25:00.3208703Z [36;1m    --data '{"jwt": "'"$OIDC_TOKEN"'", "role": "'"$VAULT_ROLE"'"}' \[0m
+2026-10-26T09:25:00.3209203Z [36;1m    "$VAULT_ADDR/v1/auth/github-oidc/login") || true[0m
+2026-10-26T09:25:00.3209513Z [36;1m[0m
+2026-10-26T09:25:00.3209834Z [36;1m  VAULT_TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r '.auth.client_token') || true[0m
+2026-10-26T09:25:00.3210233Z [36;1m  export VAULT_TOKEN[0m
+2026-10-26T09:25:00.3210461Z [36;1m[0m
+2026-10-26T09:25:00.3210714Z [36;1m  if [[ -z "$VAULT_TOKEN" || "$VAULT_TOKEN" == "null" ]]; then[0m
+2026-10-26T09:25:00.3211157Z [36;1m    ERRORS=$(echo "$LOGIN_RESPONSE" | jq -r '.errors // empty') || true[0m
+2026-10-26T09:25:00.3211667Z [36;1m    echo "::warning::Vault login failed — token is empty/null. Errors: $ERRORS"[0m
+2026-10-26T09:25:00.3212094Z [36;1m    echo "::endgroup::"[0m
+2026-10-26T09:25:00.3212505Z [36;1m    # Exponential backoff with jitter to avoid thundering herd on concurrent retries[0m
+2026-10-26T09:25:00.3213020Z [36;1m    [[ "$i" -lt "$MAX_RETRIES" ]] && sleep $(( 3 + 2 ** i + RANDOM % 3 ))[0m
+2026-10-26T09:25:00.3213377Z [36;1m    continue[0m
+2026-10-26T09:25:00.3213587Z [36;1m  fi[0m
+2026-10-26T09:25:00.3213769Z [36;1m[0m
+2026-10-26T09:25:00.3213951Z [36;1m  READ_JSON=""[0m
+2026-10-26T09:25:00.3214346Z [36;1m  if READ_JSON=$(vault read -format=json "github/token/$VAULT_ROLE" 2>/dev/null); then[0m
+2026-10-26T09:25:00.3214876Z [36;1m    GITHUB_TOKEN=$(echo "$READ_JSON" | jq -r '.data.token // empty')[0m
+2026-10-26T09:25:00.3215278Z [36;1m    if [[ -n "$GITHUB_TOKEN" ]]; then[0m
+2026-10-26T09:25:00.3215674Z [36;1m      # Mask as early as possible, before any output or further processing.[0m
+2026-10-26T09:25:00.3216200Z [36;1m      # New ghs_ installation tokens are ~520-char JWTs and are not auto-masked[0m
+2026-10-26T09:25:00.3216714Z [36;1m      # by the runner's legacy patterns. add-mask must precede GITHUB_ENV;[0m
+2026-10-26T09:25:00.3217227Z [36;1m      # referencing step outputs in a later step's env: block can still log raw.[0m
+2026-10-26T09:25:00.3217652Z [36;1m      echo "::add-mask::$GITHUB_TOKEN"[0m
+2026-10-26T09:25:00.3217982Z [36;1m      echo "GH_TOKEN=$GITHUB_TOKEN" >> "$GITHUB_ENV"[0m
+2026-10-26T09:25:00.3218807Z [36;1m      LEASE_ID=$(echo "$READ_JSON" | jq -r '.lease_id // empty')[0m
+2026-10-26T09:25:00.3219176Z [36;1m      if [[ -n "$LEASE_ID" ]]; then[0m
+2026-10-26T09:25:00.3219468Z [36;1m        HAS_VAULT_LEASE=true[0m
+2026-10-26T09:25:00.3219724Z [36;1m      fi[0m
+2026-10-26T09:25:00.3219914Z [36;1m    fi[0m
+2026-10-26T09:25:00.3220118Z [36;1m    echo "::endgroup::"[0m
+2026-10-26T09:25:00.3220419Z [36;1m    echo "token=$GITHUB_TOKEN" >> "$GITHUB_OUTPUT"[0m
+2026-10-26T09:25:00.3220820Z [36;1m    echo "has-vault-lease=$HAS_VAULT_LEASE" >> "$GITHUB_OUTPUT"[0m
+2026-10-26T09:25:00.3221167Z [36;1m    exit 0[0m
+2026-10-26T09:25:00.3221369Z [36;1m  fi[0m
+2026-10-26T09:25:00.3221552Z [36;1m[0m
+2026-10-26T09:25:00.3221793Z [36;1m  echo "::warning::vault read failed on attempt $i"[0m
+2026-10-26T09:25:00.3222114Z [36;1m  echo "::endgroup::"[0m
+2026-10-26T09:25:00.3222507Z [36;1m  # Exponential backoff with jitter to avoid thundering herd on concurrent retries[0m
+2026-10-26T09:25:00.3223019Z [36;1m  [[ "$i" -lt "$MAX_RETRIES" ]] && sleep $(( 3 + 2 ** i + RANDOM % 3 ))[0m
+2026-10-26T09:25:00.3223369Z [36;1mdone[0m
+2026-10-26T09:25:00.3223552Z [36;1m[0m
+2026-10-26T09:25:00.3223905Z [36;1mecho "::error title=Vault Token Fetch Failed::All $MAX_RETRIES retry attempts exhausted"[0m
+2026-10-26T09:25:00.3224472Z [36;1mexit 1[0m
+2026-10-26T09:25:00.3284899Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-26T09:25:00.3285233Z env:
+2026-10-26T09:25:00.3312760Z   OIDC_TOKEN: ***
+2026-10-26T09:25:00.3313035Z   VAULT_ADDR: https://vault-ci-prod.elastic.dev
+2026-10-26T09:25:00.3313369Z   VAULT_ROLE: token-policy-8c6a5ed19135
+2026-10-26T09:25:00.3313649Z   VAULT_CLIENT_TIMEOUT: 10
+2026-10-26T09:25:00.3313873Z ##[endgroup]
+2026-10-26T09:25:00.3421050Z ##[group]Attempt 1/5
+2026-10-26T09:25:15.3577576Z ##[warning]Vault login failed — token is empty/null. Errors: 
+2026-10-26T09:25:15.3579224Z ##[endgroup]
+2026-10-26T09:25:21.3582023Z ##[group]Attempt 2/5
+2026-10-26T09:25:36.3738837Z ##[warning]Vault login failed — token is empty/null. Errors: 
+2026-10-26T09:25:36.3739845Z ##[endgroup]
+2026-10-26T09:25:44.3754303Z ##[group]Attempt 3/5
+2026-10-26T09:25:59.3923896Z ##[warning]Vault login failed — token is empty/null. Errors: 
+2026-10-26T09:25:59.3924679Z ##[endgroup]
+2026-10-26T09:26:10.3923135Z ##[group]Attempt 4/5
+2026-10-26T09:26:25.4083097Z ##[warning]Vault login failed — token is empty/null. Errors: 
+2026-10-26T09:26:25.4084089Z ##[endgroup]
+2026-10-26T09:26:46.4097705Z ##[group]Attempt 5/5
+2026-10-26T09:27:01.4259138Z ##[warning]Vault login failed — token is empty/null. Errors: 
+2026-10-26T09:27:01.4260048Z ##[endgroup]
+2026-10-26T09:27:01.4262908Z ##[error]All 5 retry attempts exhausted
+2026-10-26T09:27:01.4264743Z ##[error]Process completed with exit code 1.
+2026-10-26T09:27:01.4272325Z ##[end-action id=fetch-ephemeral-token.vault-action;outcome=failure;conclusion=failure;duration_ms=121108]
+2026-10-26T09:27:01.4276204Z ##[start-action display=Token status check;id=fetch-ephemeral-token.__run_5]
+2026-10-26T09:27:01.4279009Z ##[end-action id=fetch-ephemeral-token.__run_5;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-10-26T09:27:01.4281133Z ##[start-action display=Skipped token revocation (no Vault lease / cached token);id=fetch-ephemeral-token.__run_6]
+2026-10-26T09:27:01.4286862Z ##[end-action id=fetch-ephemeral-token.__run_6;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-10-26T09:27:01.4289324Z ##[start-action display=Revoke GitHub Token on Exit;id=fetch-ephemeral-token.__elastic_ci-gh-actions]
+2026-10-26T09:27:01.4292567Z ##[end-action id=fetch-ephemeral-token.__elastic_ci-gh-actions;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-10-26T09:27:01.4426049Z ##[group]Run elastic/docs-actions/github/is-elastic-org-member@v1
+2026-10-26T09:27:01.4426436Z with:
+2026-10-26T09:27:01.4426629Z   username: insumity
+2026-10-26T09:27:01.4426858Z   collect-from-workflow-run: true
+2026-10-26T09:27:01.4427101Z env:
+2026-10-26T09:27:01.4455065Z   OIDC_TOKEN: ***
+2026-10-26T09:27:01.4455283Z ##[endgroup]
+2026-10-26T09:27:01.4459483Z ##[start-action display=Check org membership;id=check-org-membership.check]
+2026-10-26T09:27:01.4494670Z ##[group]Run actions/github-script@v9
+2026-10-26T09:27:01.4494946Z with:
+2026-10-26T09:27:01.4501908Z   script: const candidates = [];
+const explicitUsername = String(process.env.USERNAME ?? '').trim();
+if (explicitUsername) candidates.push(explicitUsername);
+
+let resolutionFailed = false;
+if (process.env.COLLECT_FROM_WORKFLOW_RUN === 'true') {
+  const run = context.payload?.workflow_run;
+  if (run) {
+    if (run.actor?.login) {
+      candidates.push(run.actor.login);
+    } else {
+      core.warning('workflow_run.actor is unavailable — failing closed');
+      resolutionFailed = true;
+    }
+
+    // On a re-run, triggering_actor identifies the account that
+    // requested the re-run. On the original run it normally matches
+    // actor; either way, every distinct account must be a member.
+    if (run.triggering_actor?.login) {
+      candidates.push(run.triggering_actor.login);
+    }
+  } else {
+    core.info('No workflow_run payload is present; checking only the explicit username');
+  }
+}
+
+const seen = new Set();
+const checked = [];
+for (const candidate of candidates) {
+  const key = candidate.toLowerCase();
+  if (seen.has(key)) continue;
+  seen.add(key);
+  checked.push(candidate);
+}
+
+core.setOutput('checked-usernames', checked.join('\n'));
+
+if (!process.env.ORG_MEMBER_TOKEN) {
+  core.warning('Token is unavailable — failing closed');
+  core.setOutput('is-member', 'false');
+  core.setOutput('non-members', checked.join('\n'));
+  return;
+}
+
+if (resolutionFailed || checked.length === 0) {
+  if (checked.length === 0) core.warning('No usernames were resolved — failing closed');
+  core.setOutput('is-member', 'false');
+  core.setOutput('non-members', '');
+  return;
+}
+
+const nonMembers = [];
+for (const username of checked) {
+  try {
+    await github.rest.orgs.checkMembershipForUser({
+      org: 'elastic',
+      username,
+    });
+    core.info(`${username} is a member of the elastic org`);
+  } catch (error) {
+    const status = error.status ?? 'unknown';
+    core.info(`${username} is not a confirmed member of the elastic org (status ${status})`);
+    nonMembers.push(username);
+  }
+}
+
+core.setOutput('is-member', nonMembers.length === 0 ? 'true' : 'false');
+core.setOutput('non-members', nonMembers.join('\n'));
+
+2026-10-26T09:27:01.4509240Z   debug: false
+2026-10-26T09:27:01.4509454Z   user-agent: actions/github-script
+2026-10-26T09:27:01.4509721Z   result-encoding: json
+2026-10-26T09:27:01.4509930Z   retries: 0
+2026-10-26T09:27:01.4510156Z   retry-exempt-status-codes: 400,401,403,404,422
+2026-10-26T09:27:01.4510440Z env:
+2026-10-26T09:27:01.4538964Z   OIDC_TOKEN: ***
+2026-10-26T09:27:01.4539200Z   COLLECT_FROM_WORKFLOW_RUN: true
+2026-10-26T09:27:01.4539451Z   ORG_MEMBER_TOKEN: 
+2026-10-26T09:27:01.4539658Z   USERNAME: insumity
+2026-10-26T09:27:01.4539866Z ##[endgroup]
+2026-10-26T09:27:01.5506336Z Error: Input required and not supplied: github-token
+2026-10-26T09:27:01.5507177Z     at Object.getInput (/home/runner/work/_actions/actions/github-script/v9/dist/index.js:212:15)
+2026-10-26T09:27:01.5508433Z     at main (/home/runner/work/_actions/actions/github-script/v9/dist/index.js:65071:24)
+2026-10-26T09:27:01.5509358Z     at /home/runner/work/_actions/actions/github-script/v9/dist/index.js:65069:1
+2026-10-26T09:27:01.5509939Z     at /home/runner/work/_actions/actions/github-script/v9/dist/index.js:65147:3
+2026-10-26T09:27:01.5510652Z     at Object.<anonymous> (/home/runner/work/_actions/actions/github-script/v9/dist/index.js:65150:12)
+2026-10-26T09:27:01.5511507Z     at Module._compile (node:internal/modules/cjs/loader:1929:14)
+2026-10-26T09:27:01.5512332Z     at Object..js (node:internal/modules/cjs/loader:2060:10)
+2026-10-26T09:27:01.5512811Z     at Module.load (node:internal/modules/cjs/loader:1651:32)
+2026-10-26T09:27:01.5513248Z     at Module._load (node:internal/modules/cjs/loader:1443:12)
+2026-10-26T09:27:01.5513695Z     at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+2026-10-26T09:27:01.5515319Z ##[error]Unhandled error: Error: Input required and not supplied: github-token
+2026-10-26T09:27:01.5580464Z ##[end-action id=check-org-membership.check;outcome=failure;conclusion=failure;duration_ms=112]
+2026-10-26T09:27:01.5758726Z Post job cleanup.
+2026-10-26T09:27:01.5821939Z Evaluate and set job outputs
+2026-10-26T09:27:01.5827807Z Set output 'event'
+2026-10-26T09:27:01.5829589Z Set output 'pr-number'
+2026-10-26T09:27:01.5830355Z Set output 'head-sha'
+2026-10-26T09:27:01.5830679Z Set output 'head-branch'
+2026-10-26T09:27:01.5831048Z Set output 'head-repo'
+2026-10-26T09:27:01.5831332Z Set output 'is-fork'
+2026-10-26T09:27:01.5831604Z Set output 'base-ref'
+2026-10-26T09:27:01.5831896Z Set output 'vale-files-match'
+2026-10-26T09:27:01.5832574Z Cleaning up orphan processes
