@@ -144,6 +144,25 @@ class GitHubClient:
                              params={"head_sha": head_sha, "per_page": 100})
         return data.get("workflow_runs", [])
 
+    def list_artifacts(self, prefix: str = "", max_pages: int = 20) -> list[dict]:
+        """Workflow artifacts of the repository whose name starts with
+        `prefix`, newest first (the runs dashboard reads the agent's run
+        records this way)."""
+        found = []
+        for page in range(1, max_pages + 1):
+            data = self._request("GET", "/actions/artifacts",
+                                 params={"per_page": 100, "page": page})
+            batch = data.get("artifacts", [])
+            found += [a for a in batch if str(a.get("name", "")).startswith(prefix)]
+            if len(batch) < 100:
+                break
+        return found
+
+    def download_artifact(self, artifact_id) -> bytes:
+        """The artifact as a zip file. GitHub answers with a redirect to
+        storage; requests drops the token when following it to another host."""
+        return self._request("GET", f"/actions/artifacts/{artifact_id}/zip", raw=True).content
+
     # ----------------------------------------------------------- read: repo
     def get_default_branch(self) -> str:
         return self._request("GET", "")["default_branch"]

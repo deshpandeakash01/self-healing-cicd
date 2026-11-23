@@ -1,0 +1,157 @@
+# Self-healing CI - a GitHub Action.
+#
+# When a CI run fails, the agent works out why and takes ONE action: re-run
+# a flaky job, open a pull request with a fix, or hand the failure to a
+# person (a comment on the failing commit). Only a passing CI run counts as
+# healed. See README.md, "Automatic healing".
+#
+# Use it from a workflow that listens for your CI workflow finishing:
+#
+#   on:
+#     workflow_run:
+#       workflows: ["CI"]
+#       types: [completed]
+#   jobs:
+#     heal:
+#       runs-on: ubuntu-latest
+#       steps:
+#         - uses: deshpandeakash01/self-healing-cicd@v1
+#           with:
+#             github-token: ${{ secrets.SELF_HEAL_TOKEN }}
+#             google-api-key: ${{ secrets.GOOGLE_API_KEY }}
+#
+# Without `live: true` it only diagnoses (dry run): the diagnosis appears on
+# the run's summary page and nothing in the repository changes.
+
+name: Self-healing CI
+description: >-
+  Diagnose a failed CI run with a classifier and Gemini, then re-run it,
+  open a fix pull request, or hand it to a person - and check CI afterwards.
+author: deshpandeakash01
+branding:
+  icon: activity
+  color: green
+
+inputs:
+  github-token:
+    description: >-
+      A fine-grained personal access token for this repository with Contents,
+      Pull requests and Actions set to read and write. (GitHub's built-in
+      GITHUB_TOKEN cannot be used: changes pushed with it do not start CI,
+      so the agent could never check its own fix.)
+    required: true
+  google-api-key:
+    description: A Gemini API key.
+    required: true
+  live:
+    description: >-
+      "true" lets the agent re-run jobs, push fix branches, open pull
+      requests and comment. Anything else is a dry run: diagnosis only.
+    required: false
+    default: "false"
+  model:
+    description: Gemini model to use (empty = the agent's default).
+    required: false
+    default: ""
+  fallback-model:
+    description: >-
+      Model to try when the main one is overloaded or out of quota (empty =
+      the agent's default; "none" switches the fallback off).
+    required: false
+    default: ""
+  retry-overloaded:
+    description: How many times to wait and retry when Gemini is overloaded (503).
+    required: false
+    default: "3"
+  notify:
+    description: >-
+      "true" (default) comments on the failing commit when the agent hands a
+      failure to a person or cannot run. Only in live mode.
+    required: false
+    default: "true"
+  python-version:
+    description: Python used to run the agent.
+    required: false
+    default: "3.12"
+
+outputs:
+  outcome:
+    description: >-
+      healed, escalated, failed, timeout, unverified, error, dry_run - or
+      empty when the run was skipped (see `skipped-reason`).
+    value: ${{ steps.agent.outputs.outcome }}
+  pull-request:
+    description: URL of the pull request the agent opened, if any.
+    value: ${{ steps.agent.outputs.pull-request }}
+  model:
+    description: The Gemini model that handled the failure.
+    value: ${{ steps.agent.outputs.model }}
+  skipped-reason:
+    description: Why the agent did not run (empty when it ran).
+    value: ${{ steps.guard.outputs.run == 'false' && steps.guard.outputs.reason || '' }}
+
+runs:
+  using: composite
+  steps:
+    # 1. The loop guards, for every user of the Action (agent/action_guard.py).
+    #    Event fields go in as environment variables, never into the command.
+    - name: Should the agent run?
+      id: guard
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      env:
+        SH_EVENT_NAME: ${{ github.event_name }}
+        SH_EVENT_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        SH_EVENT_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        SH_EVENT_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        SH_EVENT_HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+        SH_EVENT_RUN_ID: ${{ github.event.workflow_run.id }}
+        SH_REPOSITORY: ${{ github.repository }}
+      run: python3 -m agent.action_guard
+
+    - name: Set up Python
+      if: steps.guard.outputs.run == 'true'
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install the agent
+      if: steps.guard.outputs.run == 'true'
+      shell: bash
+      run: python -m pip install --quiet --disable-pip-version-check -r "$GITHUB_ACTION_PATH/requirements-agent.txt"
+
+    - name: Run the agent
+      id: agent
+      if: steps.guard.outputs.run == 'true'
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        GOOGLE_API_KEY: ${{ inputs.google-api-key }}
+        SH_GEMINI_MODEL: ${{ inputs.model }}
+        SH_GEMINI_FALLBACK_MODEL: ${{ inputs.fallback-model }}
+        # The runner starts empty every time, so there is no memory to use.
+        SH_MEMORY_TOP_K: "0"
+        SH_AUDIT_LOG: ${{ runner.temp }}/self-heal/agent_runs.jsonl
+        SH_FIX_MEMORY: ${{ runner.temp }}/self-heal/agent_fix_memory.jsonl
+        SH_REPO: ${{ github.repository }}
+        SH_RUN_ID: ${{ github.event.workflow_run.id }}
+        SH_LIVE: ${{ inputs.live }}
+        SH_NOTIFY: ${{ inputs.notify }}
+        SH_RETRIES: ${{ inputs.retry-overloaded }}
+      run: |
+        args=(--repo "$SH_REPO" --run-id "$SH_RUN_ID" --retry-overloaded "${SH_RETRIES:-3}")
+        if [ "${SH_LIVE,,}" = "true" ]; then args+=(--live); fi
+        if [ "${SH_NOTIFY,,}" != "true" ]; then args+=(--no-notify); fi
+        mkdir -p "$RUNNER_TEMP/self-heal"
+        python -m agent.run "${args[@]}"
+
+    # The runner is thrown away afterwards: keep the run record. The runs
+    # dashboard (python -m agent.dashboard --repo ...) reads these.
+    - name: Keep the run record
+      if: always() && steps.guard.outputs.run == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: self-heal-record-${{ github.event.workflow_run.id }}-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/self-heal/agent_runs.jsonl
+        if-no-files-found: ignore

@@ -9,6 +9,7 @@
 # 2. ... except these.
 !/.gitignore
 !/README.md
+!/action.yml
 !/requirements-agent.txt
 !/clean_and_label.py
 !/export_agent_repo.py

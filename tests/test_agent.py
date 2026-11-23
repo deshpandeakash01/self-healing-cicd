@@ -611,6 +611,113 @@ def test_a_red_pull_request_is_never_left_without_a_note(tmp):
     assert "unclear now" in gh.comments[-1]
 
 
+
+def test_action_guard_rules(tmp):
+    """3.49: the loop guards now run inside the Action, for every user."""
+    from agent.action_guard import should_run
+    ok = {"SH_EVENT_NAME": "workflow_run", "SH_EVENT_CONCLUSION": "failure",
+          "SH_EVENT_ATTEMPT": "1", "SH_EVENT_BRANCH": "case-13",
+          "SH_EVENT_HEAD_REPO": "o/r", "SH_REPOSITORY": "o/r", "SH_EVENT_RUN_ID": "55"}
+    assert should_run(ok) == (True, "run 55 on 'case-13' failed")
+    for change, words in [({"SH_EVENT_NAME": "push"}, "not by a finished workflow run"),
+                          ({"SH_EVENT_CONCLUSION": "success"}, "not 'failure'"),
+                          ({"SH_EVENT_ATTEMPT": "2"}, "a re-run"),
+                          ({"SH_EVENT_BRANCH": "self-heal/run-1-job-2"}, "own fix branches"),
+                          ({"SH_EVENT_HEAD_REPO": "stranger/r"}, "a fork"),
+                          ({"SH_EVENT_HEAD_REPO": ""}, "a fork"),
+                          ({"SH_EVENT_RUN_ID": ""}, "no run id")]:
+        run, reason = should_run(dict(ok, **change))
+        assert not run and words in reason, (change, reason)
+    # the Action passes these names; a renamed variable would silently skip everything
+    action = (ROOT / "action.yml").read_text(encoding="utf-8")
+    for name in ok:
+        assert f"{name}:" in action, name
+
+
+def test_run_summary_and_outputs_for_github_actions(tmp):
+    """The run page shows what happened; later steps get outcome / PR / model."""
+    import os
+    from agent.run import job_summary, write_github_outputs
+    gh = FakeGitHub(FILES, [job(1, LOG_TEST)], ci=passes)
+    s = Agent(ScriptedLLM(fix_script(), model="gemini-test"), gh, dry_run=False,
+              verbose=False).run(repo="o/r", run_id=100, job_id=1)
+    assert s["model"] == "gemini-test"
+    text = job_summary(s, "o/r", live=True)
+    assert "Self-heal:" in text and "healed" in text and "gemini-test" in text
+    assert "actions/runs/100" in text and "https://example.test/pr/1" in text
+    assert "`calc.py`: found in the code only" in text and "```diff" in text
+    assert "dry run" in job_summary(s, "o/r", live=False)
+    summary, out = Path(tmp) / "summary.md", Path(tmp) / "out.txt"
+    saved = {k: os.environ.get(k) for k in ("GITHUB_STEP_SUMMARY", "GITHUB_OUTPUT")}
+    os.environ.update(GITHUB_STEP_SUMMARY=str(summary), GITHUB_OUTPUT=str(out))
+    try:
+        write_github_outputs(s, "o/r", True)
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+    assert summary.read_text(encoding="utf-8") == text
+    assert out.read_text(encoding="utf-8").splitlines() == [
+        "outcome=healed", "pull-request=https://example.test/pr/1", "model=gemini-test"]
+
+
+def test_dashboard_groups_tries_and_never_runs_record_text(tmp):
+    """3.49: one incident per failed run; text from logs/LLM is only data."""
+    import io
+    import re
+    import zipfile
+    from agent import dashboard
+    evil = '</script><img src=x onerror="alert(1)"> & <!-- x'
+
+    def rec(time, outcome, run_id=7, dry=False, calls=2, model="m1", **kw):
+        return dict({"time": time, "repo": "o/r", "run_id": run_id, "job_name": "lint",
+                     "outcome": outcome, "dry_run": dry, "llm_calls": calls, "model": model,
+                     "seconds": 10.0, "llm_tokens": {"input": 100, "output": 10},
+                     "attempts": [{"proposal": {"root_cause": evil, "category": "other"}}]}, **kw)
+    records = [rec("2026-11-23T01:00:00+0530", "error", calls=1, llm_error="overloaded"),
+               rec("2026-11-23T01:05:00+0530", "healed", model="m2"),
+               rec("2026-11-23T02:00:00+0530", "escalated", run_id=8),
+               rec("2026-11-23T03:00:00+0530", "dry_run", run_id=9, dry=True)]
+    items = dashboard.incidents(dashboard.dedupe(records + records[:1]))   # a duplicate
+    assert len(items) == 3 and items[-1]["final"]["outcome"] == "healed"
+    first = items[-1]
+    assert len(first["earlier"]) == 1 and first["llm_calls"] == 3 and first["seconds"] == 20.0
+    sm = dashboard.summarise(items)
+    assert sm["incidents"] == 2 and sm["healed"] == 1 and sm["dry_runs"] == 1
+    assert sm["by_outcome"] == {"healed": 1, "escalated": 1} and sm["median_heal_seconds"] == 20.0
+    html = dashboard.build_html(items)
+    assert "</script><img" not in html and "<!-- x" not in html and 'onerror="' not in html
+    data = re.search(r'<script type="application/json" id="data">(.*?)</script>', html, re.S).group(1)
+    assert json.loads(data)["incidents"][-1]["final"]["attempts"][0]["proposal"]["root_cause"] == evil
+    assert "innerHTML" not in dashboard.PAGE            # text is only ever inserted as text
+
+    # records from the Action's artifacts, downloaded once and then cached
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("agent_runs.jsonl", json.dumps(rec("2026-11-23T04:00:00+0530", "healed", run_id=10)) + "\n")
+
+    class GH:
+        downloads = 0
+        def list_artifacts(self, prefix):
+            assert prefix == "self-heal-record-"
+            return [{"id": 31, "name": "self-heal-record-10-1", "expired": False},
+                    {"id": 30, "name": "self-heal-record-6-1", "expired": True}]
+        def download_artifact(self, artifact_id):
+            GH.downloads += 1
+            return buf.getvalue()
+    cache = Path(tmp) / "cache"
+    got = dashboard.fetch_artifacts(GH(), cache, say=lambda m: 0)
+    assert [r["run_id"] for r in got] == [10] and got[0]["_source"] == "self-heal-record-10-1"
+    dashboard.fetch_artifacts(GH(), cache, say=lambda m: 0)
+    assert GH.downloads == 1                             # second build: from the cache
+    out = Path(tmp) / "d.html"
+    assert dashboard.main(["--file", str(Path(tmp) / "none.jsonl"), "--out", str(out)]) == 0
+    empty = re.search(r'id="data">(.*?)</script>', out.read_text(encoding="utf-8"), re.S).group(1)
+    assert json.loads(empty)["incidents"] == [] and json.loads(empty)["summary"]["incidents"] == 0
+
+
 def test_github_client_commits_several_files_at_once(tmp):
     """The real client's calls, checked against a recorded session (no network)."""
     from agent.github_client import GitHubClient
@@ -1169,6 +1276,11 @@ def test_real_github_client_against_canned_responses(tmp):
                 return Resp(200, None, content="line one\nline two\n".encode())
             if path == "/actions/runs/100/rerun-failed-jobs":
                 return Resp(201, {})
+            if path == "/actions/artifacts":
+                return Resp(200, {"artifacts": [{"id": 5, "name": "self-heal-record-1-1"},
+                                                {"id": 6, "name": "other"}]})
+            if path == "/actions/artifacts/5/zip":
+                return Resp(200, None, content=b"PK-zip-bytes")
             return Resp(500, {"message": "unexpected " + path})
 
     session = Session()
@@ -1179,6 +1291,8 @@ def test_real_github_client_against_canned_responses(tmp):
     assert gh.get_file("missing.py") is None
     assert [j["id"] for j in gh.failed_jobs(100)] == [1, 2]     # earliest first
     assert gh.get_job_log(1) == "line one\nline two\n"
+    assert [a["id"] for a in gh.list_artifacts("self-heal-record-")] == [5]
+    assert gh.download_artifact(5) == b"PK-zip-bytes"
     for write in (lambda: gh.rerun_failed_jobs(100),
                   lambda: gh.create_branch("b", "sha"),
                   lambda: gh.put_file("calc.py", FIXED, "b", "m"),

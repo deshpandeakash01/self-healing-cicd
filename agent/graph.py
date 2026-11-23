@@ -105,6 +105,7 @@ class State(TypedDict, total=False):
     pr: dict | None
     attempts: list               # history, one entry per action tried
     outcome: str
+    model: str | None            # the LLM that handled the incident
     started: float
 
 
@@ -996,7 +997,7 @@ class Agent:
             "seconds": round(time.monotonic() - state.get("started", time.monotonic()), 1),
         })
         self._say(f"[report] outcome: {outcome}")
-        return {"outcome": outcome}
+        return {"outcome": outcome, "model": self.model}   # which model answered
 
     # ================================================================ graph
     def _build(self):

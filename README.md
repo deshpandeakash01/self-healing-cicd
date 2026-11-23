@@ -6,7 +6,9 @@ An agent that is started when a GitHub Actions run fails. It works out why the r
 - **open a pull request** with a fix, for a broken dependency, lint error or failing test;
 - **hand it to a person** (a comment on the failing commit), for anything it may not or cannot fix.
 
-A failure only counts as healed when CI passes afterwards. Every run is written to an audit log.
+A failure only counts as healed when CI passes afterwards. Every run is written to an audit log, and a dashboard shows them all.
+
+It is packaged as a **GitHub Action**: a repository adds self-healing with one short workflow file (see *Automatic healing*).
 
 ## How it works
 
@@ -46,8 +48,11 @@ These are single runs on a test repository, with faults written by the author. T
 ## Repository layout
 
 ```
+action.yml          the GitHub Action (runs the agent when CI fails)
 agent/              the agent (LangGraph graph, tools, guardrail, GitHub client, CLI)
   run.py            command-line entry point
+  action_guard.py   the Action's loop guards (when NOT to run)
+  dashboard.py      builds the runs dashboard (one HTML page)
   graph.py          the steps above
   guardrail.py      the rules, in code
   tools.py          what the LLM may do: search/read the log, list/read files, submit
@@ -55,10 +60,10 @@ agent/              the agent (LangGraph graph, tools, guardrail, GitHub client,
   evaluate.py       scores rules / classifier / LLM / cascade on hand-labelled logs
 clean_and_label.py  log cleaning used by triage (and, originally, dataset labelling)
 data/classifier_logreg_shared_final.joblib   the trained classifier (scikit-learn 1.9.0)
-tests/test_agent.py 42 tests with a stand-in LLM and a stand-in GitHub; no key, no network
+tests/test_agent.py 45 tests with a stand-in LLM and a stand-in GitHub; no key, no network
 tests/fixtures/     four real failed-CI logs the tests use
 test_repo/          the demo repository: code, its CI, the Self-heal workflow, break_it.py
-export_agent_repo.py copies just the agent into its own folder, for the workflow to check out
+export_agent_repo.py older deployment helper (copies the agent to its own repo); not needed with the Action
 ```
 
 The dataset of 8,912 logs, the labelled data and the research scripts are not in this repository. Comments such as "PROJECT_LOG 3.38" or "log 3.44" refer to the author's working log, which is kept private.
@@ -69,7 +74,7 @@ Requires Python 3.12+.
 
 ```bash
 pip install -r requirements-agent.txt
-python tests/test_agent.py              # 41 of 41 passed, 1 skipped (needs research data)
+python tests/test_agent.py              # 44 of 44 passed, 1 skipped (needs research data)
 ```
 
 The run commands below need two settings in your environment, never in a file:
@@ -100,17 +105,63 @@ Useful options:
 
 Run `python -m agent.run --help` for the full list.
 
-## Automatic healing
+## Automatic healing (the GitHub Action)
 
 To make a repository heal itself whenever its CI fails:
 
-1. Put the agent in its own GitHub repository: `python export_agent_repo.py <folder>`, then push that folder.
-2. Copy `test_repo/self-heal.yml` to `.github/workflows/self-heal.yml` on the default branch of the repository to be healed. It listens for the workflow named `CI`. Change the agent repository named in it to yours.
-3. In that repository, add two secrets under *Settings → Secrets and variables → Actions*:
-   - `SELF_HEAL_TOKEN`: a fine-grained token with Contents, Pull requests and Actions set to read/write on this repository, and Contents read-only on the agent repository. A personal token is needed because changes pushed with GitHub's built-in token do not start CI, so the agent could never verify its fix.
-   - `GOOGLE_API_KEY`: your Gemini key.
+1. Add two secrets under *Settings → Secrets and variables → Actions*:
+   - `SELF_HEAL_TOKEN`: a fine-grained personal access token for that repository with Contents, Pull requests and Actions set to read and write. GitHub's built-in token can't be used, because changes pushed with it don't start CI, so the agent could never verify its fix.
+   - `GOOGLE_API_KEY`: a Gemini key.
+2. Add `.github/workflows/self-heal.yml` on the default branch. `workflows:` must name your CI workflow:
 
-The workflow skips the agent's own `self-heal/` branches, re-runs and forks, so the agent cannot set itself off in a loop.
+```yaml
+name: Self-heal
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+permissions:
+  contents: read
+jobs:
+  heal:
+    if: github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: deshpandeakash01/self-healing-cicd@v1
+        with:
+          github-token: ${{ secrets.SELF_HEAL_TOKEN }}
+          google-api-key: ${{ secrets.GOOGLE_API_KEY }}
+          # live: true      # leave out at first: dry run, diagnosis only
+```
+
+Without `live: true` the agent only diagnoses. The diagnosis appears on the run's summary page and nothing in the repository changes. Read a few dry runs before turning `live` on.
+
+The Action has its own loop guards. It never runs for a re-run, for the agent's own `self-heal/` branches, or for a run from a fork, whatever the calling workflow says. `test_repo/self-heal.yml` is the full version used by the test repository.
+
+| Input | Default | Meaning |
+|---|---|---|
+| `github-token` | (required) | token described above |
+| `google-api-key` | (required) | Gemini key |
+| `live` | `false` | `true` lets it re-run jobs, push fix branches, open pull requests and comment |
+| `model` | agent default | Gemini model |
+| `fallback-model` | agent default | model tried when the main one is unavailable; `none` switches it off |
+| `retry-overloaded` | `3` | retries when Gemini is busy (503) |
+| `notify` | `true` | comment on the failing commit when handing over |
+| `python-version` | `3.12` | Python used to run the agent |
+
+Outputs: `outcome`, `pull-request`, `model` and `skipped-reason`, for later steps (for example, a chat notification).
+
+## Runs dashboard
+
+Every run of the Action uploads its audit record as an artifact (`self-heal-record-…`). This command collects them, together with any local runs, into one self-contained page:
+
+```bash
+python -m agent.dashboard --repo owner/name      # needs GITHUB_TOKEN with Actions: read
+python -m agent.dashboard                        # local runs only (data/agent_runs.jsonl)
+```
+
+It writes `dashboard.html`. The page shows outcome counts, median time to heal and LLM usage. Each incident's row expands to show the diagnosis, every attempt with its diff, what backed each change (a CI log line, or found in the code only), and earlier tries such as overload retries or a fallback model. Downloaded records are cached in `data/dashboard_cache/`, because GitHub deletes artifacts after 90 days by default.
 
 ## Limitations
 

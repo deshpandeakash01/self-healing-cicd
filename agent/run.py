@@ -116,6 +116,76 @@ def error_comment(state: dict, repo: str) -> str:
     ])
 
 
+def job_summary(state: dict, repo: str | None, live: bool) -> str:
+    """
+    Markdown for the GitHub Actions run page ($GITHUB_STEP_SUMMARY): what
+    failed, what the agent decided, what it changed and what backs each
+    change. Text from the LLM is shown as quoted text, never as HTML.
+    """
+    p = state.get("proposal") or {}
+    d = state.get("decision") or {}
+    outcome = state.get("outcome")
+    icon = {"healed": "\u2705", "dry_run": "\U0001F50D", "escalated": "\U0001F64B",
+            "unverified": "\u2753"}.get(outcome, "\u274C")
+    inc = state.get("incident") or {}
+    run_id = inc.get("run_id", state.get("run_id"))
+    lines = [f"### Self-heal: {icon} {outcome}", ""]
+    if repo and run_id:
+        lines.append(f"**Failed run:** [{run_id}](https://github.com/{repo}/actions/runs/{run_id})"
+                     f" \u00b7 job `{inc.get('job_name', state.get('job_name'))}`")
+    tri = state.get("first_triage") or state.get("triage") or {}
+    if tri:
+        lines.append(f"**Classifier:** {tri.get('label')} ({tri.get('confidence')})")
+    lines += [f"**Model:** {state.get('model') or 'none'}"
+              + ("" if live else " \u00b7 **dry run** (nothing was changed)"),
+              f"**Diagnosis:** {p.get('category')} \u2192 {d.get('action')}"
+              + ("" if d.get("ok", True) else " (proposal blocked by the guardrail)"),
+              "", "> " + str(p.get("root_cause") or "").replace("\n", "\n> "), ""]
+    for r in d.get("reasons") or []:
+        lines.append(f"- blocked: {r}")
+    attempts = state.get("attempts") or []
+    if len(attempts) > 1:
+        lines += ["", "**Attempts**", ""]
+        for a in attempts:
+            ap_, av = a.get("proposal") or {}, a.get("verify") or {}
+            files = ", ".join(f"`{x}`" for x in a.get("edit_paths") or []) or "no files"
+            lines.append(f"{a.get('attempt', 0) + 1}. {ap_.get('category')} \u2192 "
+                         f"{(a.get('action_result') or {}).get('action')} [{files}] \u2192 "
+                         f"{av.get('status')}")
+    evidence = [ev for a in attempts for ev in (a.get("action_result") or {}).get("evidence") or []]
+    if evidence:
+        lines += ["", "**What backs each change**", ""]
+        for ev in evidence:
+            what = (f"CI log lines {ev['log_lines']}" if ev["evidence"] == "log"
+                    else "found in the code only \u2014 check first")
+            lines.append(f"- `{ev['path']}`: {what}")
+    diffs = [(a.get("action_result") or {}).get("diff") for a in attempts]
+    diffs = [x for x in diffs if x]
+    if diffs:
+        lines += ["", "<details><summary>Change</summary>", "", "```diff",
+                  "\n".join(diffs).replace("```", "``\u200b`"), "```", "", "</details>"]
+    if state.get("pr"):
+        lines += ["", f"**Pull request:** {state['pr'].get('url')}"]
+    lines += ["", f"LLM calls: {state.get('llm_calls', 0)} \u00b7 tokens in "
+                  f"{state.get('llm_tokens_in', 0):,}, out {state.get('llm_tokens_out', 0):,}"]
+    return "\n".join(lines) + "\n"
+
+
+def write_github_outputs(state: dict, repo: str | None, live: bool) -> None:
+    """When running inside GitHub Actions: the run-page summary, and outputs
+    (outcome, pull-request, model) that later workflow steps can use."""
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary:
+        with open(summary, "a", encoding="utf-8") as f:
+            f.write(job_summary(state, repo, live))
+    out = os.environ.get("GITHUB_OUTPUT")
+    if out:
+        with open(out, "a", encoding="utf-8") as f:
+            f.write(f"outcome={state.get('outcome') or ''}\n")
+            f.write(f"pull-request={(state.get('pr') or {}).get('url') or ''}\n")
+            f.write(f"model={state.get('model') or ''}\n")
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Self-healing CI agent.")
     ap.add_argument("--repo", help='GitHub repository, "owner/name"')
@@ -211,10 +281,16 @@ def main(argv=None) -> int:
         except GitHubError as e:
             print(f"[report] could not post the error comment: {e}", file=sys.stderr)
 
+    try:
+        write_github_outputs(state, args.repo, args.live)
+    except OSError as e:                          # a summary must not fail the run
+        print(f"[report] could not write the GitHub summary: {e}", file=sys.stderr)
+
     p = state.get("proposal") or {}
     result = state.get("action_result") or {}
     print("\n" + "=" * 72)
     print(f"outcome    : {state.get('outcome')}")
+    print(f"model      : {state.get('model') or 'none'}")
     print(f"category   : {p.get('category')}")
     print(f"root cause : {p.get('root_cause')}")
     print(f"action     : {state['decision']['action']}"
