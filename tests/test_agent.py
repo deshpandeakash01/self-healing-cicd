@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from langchain_core.messages import AIMessage  # noqa: E402
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage  # noqa: E402
 
 from agent import config, guardrail, memory  # noqa: E402
 from agent.github_client import ReadOnlyError  # noqa: E402
@@ -778,44 +778,195 @@ def test_github_client_commits_several_files_at_once(tmp):
         pass
 
 
-def test_fallback_model_is_used_only_when_the_main_one_is_unavailable(tmp):
-    """23 Nov: gemini-4-hydrogen answered 503 four times in 7 minutes (3.42)."""
-    from agent.run import run_with_fallback
-    busy = {"outcome": "error", "llm_error": "Gemini is overloaded (503)"}
-    quota = {"outcome": "error", "llm_error": "Gemini quota used up for x"}
-    healed = {"outcome": "healed"}
-    asked = []
+def test_model_queue_order_tiers_and_keys(tmp):
+    """3.52: the queue is read from SH_MODEL_QUEUE; only models with a key join."""
+    from agent import models as mq
+    specs = mq.parse_queue("gemini:gemini-4-hydrogen, openrouter:nvidia/x-ultra:free, "
+                           "groq:llama-3.3-70b-versatile@diagnose")
+    assert [s.id for s in specs] == ["gemini:gemini-4-hydrogen", "openrouter:nvidia/x-ultra:free",
+                                     "groq:llama-3.3-70b-versatile"]
+    assert [s.tier for s in specs] == ["fix", "fix", "diagnose"]
+    for bad in ("grok:x", "groq:", "groq:x@expert"):
+        try:
+            mq.parse_queue(bad)
+            raise AssertionError(f"{bad!r} should be refused")
+        except ValueError:
+            pass
+    # the default queue: best first, Gemini slots from the old settings
+    default = [s.id for s in mq.configured_queue(main="gemini-4-hydrogen", fallback="gemini-3.5-flash")]
+    assert default[0] == "gemini:gemini-4-hydrogen" and default[3] == "gemini:gemini-3.5-flash"
+    assert default[1] == "groq:openai/gpt-oss-120b" and len(default) == 6
+    assert "gemini:gemini-3.5-flash" not in [s.id for s in mq.configured_queue(fallback="")]
+    # only providers with a key are used
+    said = []
+    q = mq.build_queue(env={"GROQ_API_KEY": "k"}, say=said.append, state_path=None,
+                       factory=lambda spec: None)
+    assert all(i.startswith("groq:") for i in q.ids) and "no key for" in said[0]
+    try:
+        mq.build_queue(env={}, say=said.append, state_path=None)
+        raise AssertionError("an empty queue must be refused")
+    except RuntimeError as e:
+        assert "GROQ_API_KEY" in str(e)
 
-    def start_from(answers):
-        def start(model):
-            asked.append(model)
-            return answers[model].pop(0)
-        return start
 
-    # main model busy on every try -> the fallback is used, after the retries
-    answers = {"main": [busy, busy, busy], "spare": [healed]}
-    s = run_with_fallback(start_from(answers), ["main", "spare"], 2, 0,
-                          sleep=lambda w: 0, say=lambda m: 0)
-    assert s is healed and asked == ["main", "main", "main", "spare"]
-    # main model out of quota -> straight to the fallback (a quota is not retried)
-    asked.clear()
-    answers = {"main": [quota], "spare": [healed]}
-    s = run_with_fallback(start_from(answers), ["main", "spare"], 2, 0,
-                          sleep=lambda w: 0, say=lambda m: 0)
-    assert s is healed and asked == ["main", "spare"]
-    # main model answers (even with a hand-over) -> no fallback
-    asked.clear()
-    answers = {"main": [{"outcome": "escalated"}], "spare": [healed]}
-    s = run_with_fallback(start_from(answers), ["main", "spare"], 2, 0,
-                          sleep=lambda w: 0, say=lambda m: 0)
-    assert s["outcome"] == "escalated" and asked == ["main"]
-    # both unavailable -> the last state is returned, so the error is reported
-    asked.clear()
-    answers = {"main": [quota], "spare": [quota]}
-    s = run_with_fallback(start_from(answers), ["main", "spare"], 0, 0,
-                          sleep=lambda w: 0, say=lambda m: 0)
-    assert s is quota and asked == ["main", "spare"]
+def test_model_queue_sorts_errors(tmp):
+    """Busy, per-minute and per-day limits, bad keys and unknown models differ."""
+    from agent.models import classify, retry_after
 
+    class APIError(Exception):
+        def __init__(self, status, text):
+            super().__init__(text)
+            self.status_code = status
+    cases = [
+        (QUOTA_ERROR, "quota"),                                         # Gemini, per day
+        (RuntimeError("503 UNAVAILABLE: the model is experiencing high demand"), "busy"),
+        (APIError(429, "Rate limit reached for model `openai/gpt-oss-120b` on requests per "
+                       "minute (RPM): Limit 30. Please try again in 1.5s."), "rate"),
+        (APIError(429, "Rate limit reached for model `llama-3.3-70b-versatile` on tokens per "
+                       "day (TPD): Limit 100000. Please try again in 7m12.5s."), "quota"),
+        (APIError(429, "Rate limit exceeded: free-models-per-day. Add 10 credits"), "quota"),
+        (APIError(402, "Insufficient credits"), "quota"),
+        (APIError(401, "Invalid API Key"), "auth"),
+        (APIError(404, "No endpoints found for nvidia/x:free"), "missing"),
+        (APIError(400, "tool schema not supported"), "rejected"),
+        (TimeoutError("Request timed out."), "busy"),
+    ]
+    for error, kind in cases:
+        assert classify(error)[0] == kind, (str(error)[:60], classify(error))
+    assert retry_after("Please retry in 14h40m7.36s") == 14 * 3600 + 40 * 60 + 7.36
+    assert retry_after("Please try again in 7m12.5s") == 432.5
+    assert retry_after("{'retryDelay': '41s'}") == 41
+    assert classify(cases[2][0])[1] == 1.5
+
+
+class FakeChat:
+    """A stand-in provider model: answers, or raises, step by step."""
+    def __init__(self, name, steps):
+        self.name, self.steps, self.seen, self.bound = name, list(steps), [], []
+
+    def bind_tools(self, tools, tool_choice=None):
+        self.bound.append(tool_choice)
+        return self
+
+    def invoke(self, messages):
+        self.seen.append(list(messages))
+        step = self.steps.pop(0) if self.steps else AIMessage(content="I am done.")
+        if isinstance(step, Exception):
+            raise step
+        return step(messages) if callable(step) else step
+
+
+def queue_of(chats, clock=None, **kw):
+    from agent import models as mq
+    specs = mq.parse_queue(", ".join(c.name for c in chats))
+    by_id = {s.id: c for s, c in zip(specs, chats)}
+    t = {"now": 1_800_000_000.0}
+    kw.setdefault("say", lambda m: None)
+    q = mq.ModelQueue(specs, factory=lambda spec: by_id[spec.id], clock=clock or (lambda: t["now"]),
+                      sleep=lambda secs: t.__setitem__("now", t["now"] + secs), **kw)
+    return q, t
+
+
+def test_queue_switches_model_mid_investigation(tmp):
+    """Model A answers step 1, then is busy: B continues from step 2 with A's work."""
+    a = FakeChat("gemini:a", [call("read_repo_file", path="calc.py"),
+                              RuntimeError("503 UNAVAILABLE high demand")])
+    b = FakeChat("groq:b", fix_script()[1:])           # carries on: straight to the fix
+    q, _ = queue_of([a, b], state_path=str(Path(tmp) / "q.json"))
+    gh = FakeGitHub(FILES, [job(1, LOG_TEST)], ci=passes)
+    s = Agent(q, gh, dry_run=False, verbose=False).run(repo="o/r", run_id=100, job_id=1)
+    assert s["outcome"] == "healed" and s["model"] == "groq:b"
+    assert s["step_models"][:2] == ["gemini:a", "groq:b"]
+    # B was given A's steps as plain text, in one message after the system prompt
+    first_b = b.seen[0]
+    assert len(first_b) == 2 and "EARLIER STEPS" in first_b[1].content
+    assert "[called] read_repo_file" in first_b[1].content and "[result of read_repo_file]" in first_b[1].content
+    rec = audit()[-1]
+    assert rec["models_used"] == ["gemini:a", "groq:b"] and rec["model"] == "groq:b"
+    assert rec["queue_events"][0]["model"] == "gemini:a" and rec["queue_events"][0]["kind"] == "busy"
+    # the busy model rests (and the rest is remembered in the state file)
+    saved = json.loads((Path(tmp) / "q.json").read_text(encoding="utf-8"))
+    assert saved["gemini:a"]["kind"] == "busy"
+
+
+def test_queue_remembers_a_used_up_quota_until_the_reset(tmp):
+    from agent import models as mq
+    state = str(Path(tmp) / "q.json")
+    a = FakeChat("gemini:a", [QUOTA_ERROR])
+    b = FakeChat("groq:b", fix_script())
+    q, t = queue_of([a, b], state_path=state)
+    gh = FakeGitHub(FILES, [job(1, LOG_TEST)], ci=passes)
+    assert Agent(q, gh, dry_run=False, verbose=False).run(repo="o/r", run_id=100, job_id=1)["outcome"] == "healed"
+    # a NEW run (new queue, same file) does not even try A: it is out of quota
+    a2, b2 = FakeChat("gemini:a", fix_script()), FakeChat("groq:b", fix_script())
+    q2, _ = queue_of([a2, b2], clock=lambda: t["now"] + 60, state_path=state)
+    gh = FakeGitHub(FILES, [job(1, LOG_TEST)], ci=passes)
+    Agent(q2, gh, dry_run=False, verbose=False).run(repo="o/r", run_id=100, job_id=1)
+    assert a2.seen == [] and b2.seen and "quota, back in 14h" in q2.describe()
+    # ... and uses it again once the quota has reset
+    a3 = FakeChat("gemini:a", fix_script())
+    q3, _ = queue_of([a3, FakeChat("groq:b", [])], clock=lambda: t["now"] + 15 * 3600,
+                     state_path=state)
+    gh = FakeGitHub(FILES, [job(1, LOG_TEST)], ci=passes)
+    Agent(q3, gh, dry_run=False, verbose=False).run(repo="o/r", run_id=100, job_id=1)
+    assert a3.seen
+    # no retry time given -> the provider's next daily reset
+    assert mq.next_reset("groq", 1_800_000_000.0) % 86400 == 0
+
+
+def test_queue_waits_briefly_then_gives_up_cleanly(tmp):
+    """All busy: wait for the first to return if soon; otherwise hand over."""
+    a = FakeChat("gemini:a", [RuntimeError("503 UNAVAILABLE"), call("read_repo_file", path="calc.py")]
+                 + fix_script()[1:])
+    q, t = queue_of([a])
+    gh = FakeGitHub(FILES, [job(1, LOG_TEST)], ci=passes)
+    s = Agent(q, gh, dry_run=False, verbose=False).run(repo="o/r", run_id=100, job_id=1)
+    assert s["outcome"] == "healed" and q.waited == 120          # rested 2 min, then answered
+    # every model out of quota: no waiting, a clean error naming each model
+    a = FakeChat("gemini:a", [QUOTA_ERROR])
+    b = FakeChat("openrouter:b:free", [RuntimeError("429 Rate limit exceeded: free-models-per-day")])
+    q, _ = queue_of([a, b])
+    gh = FakeGitHub(FILES, [job(1, LOG_TEST)], ci=passes)
+    s = Agent(q, gh, dry_run=False, verbose=False).run(repo="o/r", run_id=100, job_id=1)
+    assert s["outcome"] == "error" and q.waited == 0
+    assert "out of quota or unusable" in s["llm_error"] and "openrouter:b:free" in s["llm_error"]
+    assert "overloaded" not in s["llm_error"]           # so run.py does not retry pointlessly
+    assert gh.prs == []
+
+
+def test_diagnose_only_model_may_not_open_a_pull_request(tmp):
+    weak = FakeChat("groq:small@diagnose", fix_script())
+    q, _ = queue_of([weak])
+    gh = FakeGitHub(FILES, [job(1, LOG_TEST)], ci=passes)
+    s = Agent(q, gh, dry_run=False, verbose=False).run(repo="o/r", run_id=100, job_id=1)
+    assert s["outcome"] == "escalated" and gh.prs == []
+    assert "diagnose-only" in " ".join(s["decision"]["reasons"])
+
+
+def test_queue_works_with_the_real_openai_compatible_client(tmp):
+    """Offline: the request ChatOpenAI would send to Groq / OpenRouter is valid,
+    for our tools, the forced last step, and a replayed history."""
+    from langchain_openai import ChatOpenAI
+    from agent import models as mq
+    from agent.tools import Context, make_tools
+    tools = make_tools(Context())
+    chat = ChatOpenAI(model="openai/gpt-oss-120b", base_url=mq.PROVIDERS["groq"]["base_url"],
+                      api_key="test", max_retries=0)
+    bound = chat.bind_tools(tools)
+    sent = json.dumps(bound.kwargs["tools"])
+    assert "$ref" not in sent and "submit_diagnosis" in sent and "file_edits" in sent
+    last = chat.bind_tools([t for t in tools if t.name == "submit_diagnosis"],
+                           tool_choice="submit_diagnosis")
+    assert last.kwargs["tool_choice"]["function"]["name"] == "submit_diagnosis"
+    # a history started by Gemini, replayed for Groq, builds a valid request
+    a_msg = AIMessage(content="", tool_calls=[{"name": "read_repo_file", "args": {"path": "calc.py"},
+                                               "id": "g-1"}], response_metadata={"sh_model": "gemini:a"})
+    msgs = [SystemMessage("sys"), HumanMessage("A job failed."), a_msg,
+            ToolMessage("def add(a, b): ...", name="read_repo_file", tool_call_id="g-1")]
+    payload = chat._get_request_payload(mq.portable(msgs, "groq:openai/gpt-oss-120b"))
+    assert [m["role"] for m in payload["messages"]] == ["system", "user"]
+    # unchanged when the same model continues
+    assert mq.portable(msgs, "gemini:a") is msgs
 
 def test_guardrail_blocks_edit_of_unread_file(tmp):
     gh = FakeGitHub(FILES, [job(1, LOG_TEST)])

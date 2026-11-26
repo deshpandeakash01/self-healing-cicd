@@ -106,6 +106,7 @@ class State(TypedDict, total=False):
     attempts: list               # history, one entry per action tried
     outcome: str
     model: str | None            # the LLM that handled the incident
+    step_models: list            # which model answered each LLM step (queue, 3.52)
     started: float
 
 
@@ -204,6 +205,8 @@ def _llm_error_text(error: Exception) -> str:
     model, and when it is worth trying again.
     """
     raw = " ".join(str(error).split())
+    if type(error).__name__ == "QueueUnavailable":
+        return raw                     # already one readable sentence (models.py)
     if "RESOURCE_EXHAUSTED" in raw or " 429" in raw or raw.startswith("429"):
         model = re.search(r"model: ([\w.\-]+)", raw)
         limit = re.search(r"limit: (\d+)", raw)
@@ -225,6 +228,20 @@ def _llm_error_text(error: Exception) -> str:
         return ("Gemini is overloaded (503: the model is experiencing high demand). "
                 "Nothing is wrong with the key or the quota; try again in a few minutes.")
     return raw if len(raw) <= 300 else raw[:300] + "..."
+
+
+def _unique(items: list) -> list:
+    out = []
+    for x in items:
+        if x and x not in out:
+            out.append(x)
+    return out
+
+
+def _final_model(state: dict, default):
+    """The model that answered last (with a queue it can change mid-way)."""
+    steps = [m for m in state.get("step_models") or [] if m]
+    return steps[-1] if steps else default
 
 
 def _trace(calls: list) -> list[str]:
@@ -315,6 +332,9 @@ class Agent:
         self.tools_by_name = {t.name: t for t in self.tools}
         # Which model answers, for the audit log: two runs on the same log are
         # only comparable if the record says which model produced each.
+        # A ModelQueue (models.py) answers with several models; each step
+        # then records its own (state["step_models"]).
+        self.queue = llm if hasattr(llm, "tier_of") else None
         self.model = (model_name(llm)
                       if llm is not None and self.mode != "classifier_only" else None)
         self.thinking = thinking_level(llm) if self.model else None
@@ -561,10 +581,12 @@ class Agent:
         waited = time.monotonic() - asked
         usage = getattr(ai, "usage_metadata", None) or {}
         calls = getattr(ai, "tool_calls", None) or []
+        answered = (getattr(ai, "response_metadata", None) or {}).get("sh_model") or self.model
         self._say(f"[agent] step {state.get('llm_steps', 0) + 1}: "
                   + (", ".join(c["name"] for c in calls) or "no tool call")
-                  + f"  ({waited:.0f}s)")
+                  + f"  ({waited:.0f}s" + (f", {answered}" if self.queue else "") + ")")
         return {"messages": messages + [ai],
+                "step_models": state.get("step_models", []) + [answered],
                 "tool_trace": state.get("tool_trace", []) + [_trace(calls)],
                 "llm_steps": state.get("llm_steps", 0) + 1,
                 "llm_calls": state.get("llm_calls", 0) + 1,
@@ -641,6 +663,15 @@ class Agent:
             reruns_done=state.get("reruns_done", 0), online=self.online,
             existing_files=existing, files_read_full=self.ctx.files_read_full,
             current_files=current)
+        # A "diagnose" model in the queue may not open a pull request
+        # (3.52): weaker free models can find causes, but their edits are
+        # not trusted. Its diagnosis still reaches the person it is handed to.
+        submitter = (state.get("step_models") or [None])[-1]
+        if (decision["ok"] and decision["action"] == "fix_pr" and self.queue
+                and self.queue.tier_of(submitter) == "diagnose"):
+            decision = {"action": "escalate", "ok": False, "edits": [], "reasons": [
+                f"{submitter} is a diagnose-only model in the queue; it may not "
+                "open a fix pull request"]}
         if not decision["ok"]:
             self._say("[guardrail] BLOCKED -> escalate: " + "; ".join(decision["reasons"]))
         else:
@@ -1005,7 +1036,10 @@ class Agent:
             "job_name": (state.get("incident") or {}).get("job_name",
                                                           state.get("job_name")),
             "mode": self.mode,
-            "model": self.model,
+            "model": _final_model(state, self.model),
+            # with the model queue: who answered each step, and what happened
+            "models_used": _unique(state.get("step_models") or []),
+            "queue_events": list(self.queue.events) if self.queue else [],
             "thinking_level": self.thinking,
             "dry_run": self.dry_run,
             "online": self.online,
@@ -1024,7 +1058,7 @@ class Agent:
             "seconds": round(time.monotonic() - state.get("started", time.monotonic()), 1),
         })
         self._say(f"[report] outcome: {outcome}")
-        return {"outcome": outcome, "model": self.model}   # which model answered
+        return {"outcome": outcome, "model": _final_model(state, self.model)}   # which model answered
 
     # ================================================================ graph
     def _build(self):

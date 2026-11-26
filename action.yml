@@ -41,8 +41,25 @@ inputs:
       so the agent could never check its own fix.)
     required: true
   google-api-key:
-    description: A Gemini API key.
-    required: true
+    description: >-
+      A Gemini API key. Each of the three keys adds that provider's models to
+      the model queue; at least one is needed.
+    required: false
+    default: ""
+  groq-api-key:
+    description: A Groq API key (free tier; adds Groq's models to the queue).
+    required: false
+    default: ""
+  openrouter-api-key:
+    description: An OpenRouter API key (free models; adds them to the queue).
+    required: false
+    default: ""
+  model-queue:
+    description: >-
+      The model queue, best first: "provider:model[@diagnose], ..." with
+      provider gemini, groq or openrouter (empty = the agent's default queue).
+    required: false
+    default: ""
   live:
     description: >-
       "true" lets the agent re-run jobs, push fix branches, open pull
@@ -50,17 +67,17 @@ inputs:
     required: false
     default: "false"
   model:
-    description: Gemini model to use (empty = the agent's default).
+    description: The first Gemini model in the default queue (empty = the agent's default).
     required: false
     default: ""
   fallback-model:
     description: >-
-      Model to try when the main one is overloaded or out of quota (empty =
-      the agent's default; "none" switches the fallback off).
+      The second Gemini model in the default queue (empty = the agent's
+      default; "none" removes it).
     required: false
     default: ""
   retry-overloaded:
-    description: How many times to wait and retry when Gemini is overloaded (503).
+    description: How many times to wait and start again when every model in the queue is overloaded.
     required: false
     default: "3"
   notify:
@@ -84,7 +101,7 @@ outputs:
     description: URL of the pull request the agent opened, if any.
     value: ${{ steps.agent.outputs.pull-request }}
   model:
-    description: The Gemini model that handled the failure.
+    description: The model that answered last (the queue may switch models mid-way).
     value: ${{ steps.agent.outputs.model }}
   skipped-reason:
     description: Why the agent did not run (empty when it ran).
@@ -120,6 +137,15 @@ runs:
       shell: bash
       run: python -m pip install --quiet --disable-pip-version-check -r "$GITHUB_ACTION_PATH/requirements-agent.txt"
 
+    # The queue remembers which models are busy or out of quota between runs.
+    - name: Restore the model queue's memory
+      if: steps.guard.outputs.run == 'true'
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ runner.temp }}/self-heal-queue
+        key: self-heal-queue-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: self-heal-queue-
+
     - name: Run the agent
       id: agent
       if: steps.guard.outputs.run == 'true'
@@ -128,6 +154,10 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
         GOOGLE_API_KEY: ${{ inputs.google-api-key }}
+        GROQ_API_KEY: ${{ inputs.groq-api-key }}
+        OPENROUTER_API_KEY: ${{ inputs.openrouter-api-key }}
+        SH_MODEL_QUEUE: ${{ inputs.model-queue }}
+        SH_QUEUE_STATE: ${{ runner.temp }}/self-heal-queue/state.json
         SH_GEMINI_MODEL: ${{ inputs.model }}
         SH_GEMINI_FALLBACK_MODEL: ${{ inputs.fallback-model }}
         # The runner starts empty every time, so there is no memory to use.
@@ -145,6 +175,13 @@ runs:
         if [ "${SH_NOTIFY,,}" != "true" ]; then args+=(--no-notify); fi
         mkdir -p "$RUNNER_TEMP/self-heal"
         python -m agent.run "${args[@]}"
+
+    - name: Save the model queue's memory
+      if: always() && steps.guard.outputs.run == 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ runner.temp }}/self-heal-queue
+        key: self-heal-queue-${{ github.run_id }}-${{ github.run_attempt }}
 
     # The runner is thrown away afterwards: keep the run record. The runs
     # dashboard (python -m agent.dashboard --repo ...) reads these.

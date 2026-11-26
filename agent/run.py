@@ -21,8 +21,11 @@ EXAMPLES (from the project root)
       python -m agent.run --repo you/your-test-repo --run-id 1234567890 --live --retry-overloaded 3
 
 ENVIRONMENT
-    GITHUB_TOKEN     needed with --repo
-    GOOGLE_API_KEY   needed unless --mode classifier_only
+    GITHUB_TOKEN        needed with --repo
+    GOOGLE_API_KEY      Gemini   } at least one of these, unless
+    GROQ_API_KEY        Groq     } --mode classifier_only. Each one adds
+    OPENROUTER_API_KEY  OpenRouter} that provider's models to the queue.
+    SH_MODEL_QUEUE      the queue itself (see agent/models.py)
 """
 
 from __future__ import annotations
@@ -57,34 +60,9 @@ def run_with_retries(start, retries: int, wait: float, sleep=time.sleep, say=pri
     for n in range(1, retries + 1):
         if not overloaded(state):
             break
-        say(f"[retry] Gemini is overloaded; trying again in {wait:.0f}s ({n} of {retries})")
+        say(f"[retry] the models are overloaded; trying again in {wait:.0f}s ({n} of {retries})")
         sleep(wait)
         state = start()
-    return state
-
-
-def unavailable(state: dict) -> bool:
-    """The LLM could not be used at all - overloaded or out of quota - and
-    nothing was written. Another model may still be available."""
-    return (state.get("outcome") == "error" and bool(state.get("llm_error"))
-            and not state.get("pr"))
-
-
-def run_with_fallback(start, models: list, retries: int, wait: float,
-                      sleep=time.sleep, say=print) -> dict:
-    """
-    Try each model in turn (with the overload retries for each) until one
-    is available. `start(model)` runs the agent once with that model. A
-    model that answered is never swapped mid-incident: the switch happens
-    only when the previous one could not be used at all.
-    """
-    state = {}
-    for i, model in enumerate(models):
-        if i:
-            say(f"[fallback] {models[i - 1]} is unavailable; trying {model}")
-        state = run_with_retries(lambda m=model: start(m), retries, wait, sleep, say)
-        if not unavailable(state):
-            break
     return state
 
 
@@ -116,6 +94,15 @@ def error_comment(state: dict, repo: str) -> str:
     ])
 
 
+def _models_text(state: dict) -> str:
+    """'groq:openai/gpt-oss-120b' or, after a switch, 'gemini:... -> groq:...'."""
+    used = []
+    for m in state.get("step_models") or []:
+        if m and m not in used:
+            used.append(m)
+    return " -> ".join(used) or state.get("model") or "none"
+
+
 def job_summary(state: dict, repo: str | None, live: bool) -> str:
     """
     Markdown for the GitHub Actions run page ($GITHUB_STEP_SUMMARY): what
@@ -136,7 +123,7 @@ def job_summary(state: dict, repo: str | None, live: bool) -> str:
     tri = state.get("first_triage") or state.get("triage") or {}
     if tri:
         lines.append(f"**Classifier:** {tri.get('label')} ({tri.get('confidence')})")
-    lines += [f"**Model:** {state.get('model') or 'none'}"
+    lines += [f"**Model:** {_models_text(state)}"
               + ("" if live else " \u00b7 **dry run** (nothing was changed)"),
               f"**Diagnosis:** {p.get('category')} \u2192 {d.get('action')}"
               + ("" if d.get("ok", True) else " (proposal blocked by the guardrail)"),
@@ -202,11 +189,16 @@ def main(argv=None) -> int:
     ap.add_argument("--no-memory", action="store_true",
                     help="do not show the LLM earlier verified fixes (for clean trials)")
     ap.add_argument("--retry-overloaded", type=int, default=0, metavar="N",
-                    help="when Gemini is overloaded (503), wait and try again N times")
+                    help="when every model in the queue is overloaded, wait and start "
+                         "again N times")
     ap.add_argument("--retry-wait", type=float, default=120.0, metavar="SECONDS")
     ap.add_argument("--fallback-model", default=config.GEMINI_FALLBACK_MODEL, metavar="NAME",
-                    help="Gemini model to try when the main one is overloaded or out of "
-                         "quota (default %(default)s; '' to switch off)")
+                    help="the second Gemini model in the default queue (default "
+                         "%(default)s; '' removes it)")
+    ap.add_argument("--models", metavar="QUEUE",
+                    help='the model queue, best first, e.g. "gemini:gemini-4-hydrogen, '
+                         'groq:openai/gpt-oss-120b" (default: SH_MODEL_QUEUE or the built-in '
+                         'queue; see agent/models.py)')
     ap.add_argument("--no-notify", action="store_true",
                     help="in live mode, do not comment on the failing commit when "
                          "handing over to a human")
@@ -230,23 +222,25 @@ def main(argv=None) -> int:
             return 2
         gh = GitHubClient(args.repo, read_only=not args.live)
 
-    models, llms = [None], {}
+    queue = None
     if args.mode != "classifier_only":
-        from .llm import make_llm
-        models = [config.GEMINI_MODEL]
-        if args.fallback_model and args.fallback_model != config.GEMINI_MODEL:
-            models.append(args.fallback_model)
+        from . import models as model_queue
+        if args.models:
+            os.environ["SH_MODEL_QUEUE"] = args.models
+        config.GEMINI_FALLBACK_MODEL = args.fallback_model or ""
         try:
-            llms[config.GEMINI_MODEL] = make_llm()
-        except RuntimeError as e:
+            queue = model_queue.build_queue(max_wait=config.QUEUE_MAX_WAIT,
+                                            say=(lambda *a: None) if args.quiet else print)
+        except (RuntimeError, ValueError) as e:
             print(e, file=sys.stderr)
             return 2
+        if not args.quiet:
+            print("[queue] " + queue.describe())
 
-    def start(model=None) -> dict:
-        # A fresh agent each time, so a retry starts from a clean state.
-        if model and model not in llms:
-            llms[model] = make_llm(model)
-        agent = Agent(llms.get(model), gh, dry_run=not args.live, wait=not args.no_wait,
+    def start() -> dict:
+        # A fresh agent each time, so a retry starts from a clean state. The
+        # queue is shared: it remembers which models are resting.
+        agent = Agent(queue, gh, dry_run=not args.live, wait=not args.no_wait,
                       mode=args.mode, verbose=not args.quiet, notify=not args.no_notify)
         if args.log_file:
             with open(args.log_file, encoding="utf-8", errors="replace") as f:
@@ -264,7 +258,7 @@ def main(argv=None) -> int:
                 print(f"Run {args.run_id} has no failed jobs.")
                 return 0
             job_id = failed[0]["id"]
-        state = run_with_fallback(start, models, args.retry_overloaded, args.retry_wait)
+        state = run_with_retries(start, args.retry_overloaded, args.retry_wait)
     except GitHubError as e:
         print(f"GitHub error: {e}", file=sys.stderr)
         return 1
@@ -290,7 +284,7 @@ def main(argv=None) -> int:
     result = state.get("action_result") or {}
     print("\n" + "=" * 72)
     print(f"outcome    : {state.get('outcome')}")
-    print(f"model      : {state.get('model') or 'none'}")
+    print(f"model      : {_models_text(state)}")
     print(f"category   : {p.get('category')}")
     print(f"root cause : {p.get('root_cause')}")
     print(f"action     : {state['decision']['action']}"

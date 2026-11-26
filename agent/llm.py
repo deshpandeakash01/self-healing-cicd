@@ -12,7 +12,7 @@ import os
 from . import config
 
 
-def make_llm(model: str | None = None):
+def make_llm(model: str | None = None, max_retries: int = 2):
     # Imported here so that classifier_only mode and the tests do not need
     # the Gemini package installed.
     from langchain_google_genai import ChatGoogleGenerativeAI
@@ -27,7 +27,7 @@ def make_llm(model: str | None = None):
     return ChatGoogleGenerativeAI(
         model=model or config.GEMINI_MODEL,
         temperature=0,        # same input should give the same diagnosis
-        max_retries=2,
+        max_retries=max_retries,
         **extra,
     )
 

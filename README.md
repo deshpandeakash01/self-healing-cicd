@@ -22,10 +22,23 @@ failed run ─► ingest ─► triage ──► confident flaky failure ──�
 
 1. **Ingest:** downloads the failed job's log, plus the ends of the logs of other jobs that failed in the same run.
 2. **Triage:** a small classifier (TF-IDF + logistic regression, built from a dataset of 8,912 failed GitHub Actions logs from 106 repositories in 11 languages) labels the failure. It re-runs a clearly flaky failure on its own, with no LLM call. Anything else goes to the LLM, with the classifier's label as a hint only.
-3. **Investigate:** an LLM (Google Gemini, through LangGraph) searches the log and reads repository files with tools. It then submits one diagnosis and one action. Fixes are exact text replacements, so it can safely edit files of any size.
+3. **Investigate:** an LLM, taken from the **model queue** (below) and run through LangGraph, searches the log and reads repository files with tools. It then submits one diagnosis and one action. Fixes are exact text replacements, so it can safely edit files of any size.
 4. **Guardrail:** plain code, not a prompt, decides whether the action may happen. Each kind of failure has its own allowed actions. Workflow files, secrets and keys are never edited, a fix may change at most 5 files, and a whole file is replaced only after it has been read in full. Anything blocked becomes a hand-over, with the reasons recorded.
 5. **Act:** a fix is one commit on a new `self-heal/…` branch, and a pull request is opened against the branch that failed. The agent never pushes to an existing branch of yours.
 6. **Verify and retry:** the agent waits for CI on the fix. If CI is still red, it reads the new log and tries once more on the same pull request. After that it hands over.
+
+**The model queue.** Free LLM tiers are small and often busy, so the agent works through a queue of free models, best first:
+
+| # | Model | Provider | May open fix PRs |
+|---|---|---|---|
+| 1 | `gemini-4-hydrogen` | Gemini | yes |
+| 2 | `openai/gpt-oss-120b` | Groq | yes |
+| 3 | `nvidia/nemotron-3-ultra-550b-a55b:free` | OpenRouter | yes |
+| 4 | `gemini-3.5-flash` | Gemini | yes |
+| 5 | `llama-3.3-70b-versatile` | Groq | no, diagnose only |
+| 6 | `google/gemma-4-26b-a4b-it:free` | OpenRouter | no, diagnose only |
+
+When a model is busy (503, timeout) it rests for a few minutes. When it runs out of its daily quota it is skipped until the reset. The **next model continues the same investigation**, given the earlier steps as plain text, so nothing read so far is lost. Only providers whose key is set join the queue. The queue remembers resting models between runs. Change it with `SH_MODEL_QUEUE` (`provider:model[@diagnose], ...`) or `--models`. Positions 1 and 4 are measured on the test repository; the others are ranked from their providers' descriptions, to be re-ranked from test results.
 
 **What backs each change.** An early failure can hide later ones: a broken install stops lint and tests from ever running. The agent may fix faults it finds by reading the code, but it labels every edit either as backed by the CI log (with line numbers) or as found in the code only. "Log" claims are checked against the cited lines. The pull request lists code-only changes separately, under *please check these first*.
 
@@ -53,6 +66,7 @@ agent/              the agent (LangGraph graph, tools, guardrail, GitHub client,
   run.py            command-line entry point
   action_guard.py   the Action's loop guards (when NOT to run)
   dashboard.py      builds the runs dashboard (one HTML page)
+  models.py         the model queue (which LLM answers; switching when one is busy or out of quota)
   graph.py          the steps above
   guardrail.py      the rules, in code
   tools.py          what the LLM may do: search/read the log, list/read files, submit
@@ -60,7 +74,7 @@ agent/              the agent (LangGraph graph, tools, guardrail, GitHub client,
   evaluate.py       scores rules / classifier / LLM / cascade on hand-labelled logs
 clean_and_label.py  log cleaning used by triage (and, originally, dataset labelling)
 data/classifier_logreg_shared_final.joblib   the trained classifier (scikit-learn 1.9.0)
-tests/test_agent.py 46 tests with a stand-in LLM and a stand-in GitHub; no key, no network
+tests/test_agent.py 52 tests with a stand-in LLM and a stand-in GitHub; no key, no network
 tests/fixtures/     four real failed-CI logs the tests use
 test_repo/          the demo repository: code, its CI, the Self-heal workflow, break_it.py
 export_agent_repo.py older deployment helper (copies the agent to its own repo); not needed with the Action
@@ -74,12 +88,12 @@ Requires Python 3.12+.
 
 ```bash
 pip install -r requirements-agent.txt
-python tests/test_agent.py              # 45 of 45 passed, 1 skipped (needs research data)
+python tests/test_agent.py              # 51 of 51 passed, 1 skipped (needs research data)
 ```
 
-The run commands below need two settings in your environment, never in a file:
+The run commands below need settings in your environment, never in a file:
 - `GITHUB_TOKEN`: a fine-grained token for the repository.
-- `GOOGLE_API_KEY`: a Gemini key.
+- At least one model key: `GOOGLE_API_KEY` (Gemini), `GROQ_API_KEY` (Groq) or `OPENROUTER_API_KEY` (OpenRouter). Each key you set adds that provider's models to the queue.
 
 Set them in your shell's environment variables (for example in PowerShell, `$env:GOOGLE_API_KEY = "..."`), and never commit them.
 
@@ -99,7 +113,7 @@ python -m agent.run --log-file path/to/log.txt
 
 Useful options:
 - `--retry-overloaded 3`: retry when Gemini is busy.
-- `--fallback-model NAME`: the model to try when the main one is unavailable.
+- `--models "gemini:gemini-4-hydrogen, groq:openai/gpt-oss-120b"`: use your own model queue, best first.
 - `--no-memory`: don't show the LLM earlier fixes.
 - `--mode classifier_only` or `--mode llm_only`: run only one of the two stages.
 
@@ -111,7 +125,7 @@ To make a repository heal itself whenever its CI fails:
 
 1. Add two secrets under *Settings → Secrets and variables → Actions*:
    - `SELF_HEAL_TOKEN`: a fine-grained personal access token for that repository with Contents, Pull requests and Actions set to read and write. GitHub's built-in token can't be used, because changes pushed with it don't start CI, so the agent could never verify its fix.
-   - `GOOGLE_API_KEY`: a Gemini key.
+   - `GOOGLE_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`: model keys. Set at least one; each adds its provider's models to the queue.
 2. Add `.github/workflows/self-heal.yml` on the default branch. `workflows:` must name your CI workflow:
 
 ```yaml
@@ -132,6 +146,8 @@ jobs:
         with:
           github-token: ${{ secrets.SELF_HEAL_TOKEN }}
           google-api-key: ${{ secrets.GOOGLE_API_KEY }}
+          groq-api-key: ${{ secrets.GROQ_API_KEY }}
+          openrouter-api-key: ${{ secrets.OPENROUTER_API_KEY }}
           # live: true      # leave out at first: dry run, diagnosis only
 ```
 
@@ -142,11 +158,12 @@ The Action has its own loop guards. It never runs for a re-run, for the agent's 
 | Input | Default | Meaning |
 |---|---|---|
 | `github-token` | (required) | token described above |
-| `google-api-key` | (required) | Gemini key |
+| `google-api-key`, `groq-api-key`, `openrouter-api-key` | (at least one) | model keys; each adds its provider's models to the queue |
+| `model-queue` | built-in queue | your own queue, best first: `provider:model[@diagnose], ...` |
 | `live` | `false` | `true` lets it re-run jobs, push fix branches, open pull requests and comment |
-| `model` | agent default | Gemini model |
-| `fallback-model` | agent default | model tried when the main one is unavailable; `none` switches it off |
-| `retry-overloaded` | `3` | retries when Gemini is busy (503) |
+| `model` | agent default | the first Gemini model in the built-in queue |
+| `fallback-model` | agent default | the second Gemini model in the built-in queue; `none` removes it |
+| `retry-overloaded` | `3` | how often to start again when every model is busy |
 | `notify` | `true` | comment on the failing commit when handing over |
 | `python-version` | `3.12` | Python used to run the agent |
 
@@ -166,5 +183,6 @@ It writes `dashboard.html`. The page shows outcome counts, median time to heal a
 ## Limitations
 
 - It has been tested on one small Python repository. Logs from other languages are triaged, but repairing them is untested.
-- The Gemini free tier allows about 20 requests a day per model and is often overloaded. One investigation uses a few requests, up to about 10 for a hard case.
+- Free tiers are small (Gemini about 20 requests a day per model; OpenRouter free models 50 a day) and often busy. The model queue spreads the work across providers, but a day of heavy testing can still use them all up. One investigation uses a few requests, up to about 15 for a hard case.
+- Free models may log prompts and use them for training. For a private repository, set your own `model-queue` with providers you accept.
 - A fix can be wrong in ways CI does not catch. Every change arrives as a pull request for a person to review; nothing is merged automatically.

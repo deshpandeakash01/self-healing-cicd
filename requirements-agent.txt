@@ -11,6 +11,8 @@ joblib
 langgraph>=1.2
 langchain-core>=1.8
 langchain-google-genai>=4.5
+# Groq and OpenRouter (the model queue, 3.52) speak the OpenAI API.
+langchain-openai>=1.8
 pydantic>=2
 requests
 

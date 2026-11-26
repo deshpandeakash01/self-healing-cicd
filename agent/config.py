@@ -81,6 +81,12 @@ if GEMINI_FALLBACK_MODEL.lower() == "none":
 GEMINI_THINKING_LEVEL = os.environ.get("SH_GEMINI_THINKING_LEVEL", "").strip().lower()
 
 # --- Limits (the agent stops and hands over to a human beyond these) ----------
+# The model queue (agent/models.py, log 3.52): its order, and where it
+# remembers which models are resting (busy or out of quota) between runs.
+MODEL_QUEUE = os.environ.get("SH_MODEL_QUEUE", "").strip()
+QUEUE_STATE = os.environ.get("SH_QUEUE_STATE") or str(PROJECT_ROOT / "data" / "model_queue_state.json")
+QUEUE_MAX_WAIT = float(os.environ.get("SH_QUEUE_MAX_WAIT") or 180)   # seconds
+
 MAX_LLM_STEPS = _int("SH_MAX_LLM_STEPS", 15)       # LLM calls per investigation
 MAX_FIX_ATTEMPTS = _int("SH_MAX_FIX_ATTEMPTS", 2)  # actions tried per incident
 MAX_UPSTREAM_HOPS = _int("SH_MAX_UPSTREAM_HOPS", 1)
