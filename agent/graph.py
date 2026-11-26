@@ -146,6 +146,23 @@ Categories (choose the ROOT CAUSE, not the last line of the log)
 """
 
 
+LAST_STEP_TEXT = (
+    "This is your LAST step: no more tools can be used after it. Call "
+    "submit_diagnosis now with what you have found so far. Propose a fix only "
+    "for files you have read and only if you are confident; otherwise use "
+    "action 'escalate' and say in the explanation what you found and what a "
+    "person should look at next.")
+
+
+def _bind_submit_only(llm, submit_tool):
+    """The model with only submit_diagnosis available, and forced to call it
+    where the library supports that (langchain-google-genai: tool_choice)."""
+    try:
+        return llm.bind_tools([submit_tool], tool_choice=submit_tool.name)
+    except TypeError:                     # a model wrapper without tool_choice
+        return llm.bind_tools([submit_tool])
+
+
 def _evidence_lines(edits: list, evidence: list | None) -> list[str]:
     """
     The "what backs each change" part of a PR description or retry comment.
@@ -302,6 +319,11 @@ class Agent:
                       if llm is not None and self.mode != "classifier_only" else None)
         self.thinking = thinking_level(llm) if self.model else None
         self.llm = llm.bind_tools(self.tools) if llm is not None else None
+        # The LAST allowed call may only submit (log 3.50): a model that is
+        # still reading files when the limit comes must report what it found
+        # instead of being cut off with nothing.
+        self.llm_last = _bind_submit_only(llm, self.tools_by_name["submit_diagnosis"]) \
+            if llm is not None else None
         self.graph = self._build()
 
     def _say(self, text: str) -> None:
@@ -520,9 +542,14 @@ class Agent:
             self._say("[agent] step limit reached -> escalate")
             return {"proposal": self._give_up(
                 f"Step limit of {config.MAX_LLM_STEPS} LLM calls reached.")}
+        messages, llm = state["messages"], self.llm
+        if state.get("llm_steps", 0) == config.MAX_LLM_STEPS - 1:
+            self._say("[agent] last step: the model must submit its diagnosis now")
+            messages = messages + [HumanMessage(LAST_STEP_TEXT)]
+            llm = self.llm_last
         asked = time.monotonic()
         try:
-            ai = self.llm.invoke(state["messages"])
+            ai = llm.invoke(messages)
         except Exception as e:                           # noqa: BLE001
             # An API error must end the run cleanly, with an audit record.
             # It is NOT a diagnosis, so it is recorded as an error, not as a
@@ -537,7 +564,7 @@ class Agent:
         self._say(f"[agent] step {state.get('llm_steps', 0) + 1}: "
                   + (", ".join(c["name"] for c in calls) or "no tool call")
                   + f"  ({waited:.0f}s)")
-        return {"messages": state["messages"] + [ai],
+        return {"messages": messages + [ai],
                 "tool_trace": state.get("tool_trace", []) + [_trace(calls)],
                 "llm_steps": state.get("llm_steps", 0) + 1,
                 "llm_calls": state.get("llm_calls", 0) + 1,

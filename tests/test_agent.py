@@ -871,6 +871,31 @@ def test_step_limit(tmp):
     assert "Step limit" in s["proposal"]["explanation"]
 
 
+def test_last_step_must_submit_a_diagnosis(tmp):
+    """3.50: on case-14 the fallback model read files until the step limit and
+    handed over with nothing. The last call now sees only submit_diagnosis."""
+    bound = []
+
+    class Recording(ScriptedLLM):
+        def bind_tools(self, tools, tool_choice=None):
+            bound.append(([t.name for t in tools], tool_choice))
+            return self
+    last = config.MAX_LLM_STEPS - 1
+    steps = [lambda m: call("read_repo_file", path="calc.py")] * last + [
+        lambda m: call("submit_diagnosis", category="test_failure", root_cause="add() subtracts",
+                       action="fix_pr", explanation="seen in calc.py",
+                       file_edits=[{"path": "calc.py", "evidence": "code",
+                                    "replacements": [{"old": "a - b", "new": "a + b"}]}])]
+    gh = FakeGitHub(FILES, [job(1, LOG_TEST)], ci=passes)
+    llm = Recording(steps)
+    s = Agent(llm, gh, dry_run=False, verbose=False).run(repo="o/r", run_id=100, job_id=1)
+    assert s["outcome"] == "healed" and llm.calls == config.MAX_LLM_STEPS
+    assert ["submit_diagnosis"] == bound[-1][0] and bound[-1][1] == "submit_diagnosis"
+    assert len(bound[0][0]) > 1                       # normal steps keep every tool
+    assert "LAST step" in llm.seen[-1][-1].content    # only the last call is told
+    assert all("LAST step" not in getattr(m[-1], "content", "") for m in llm.seen[:-1])
+
+
 def test_model_that_never_answers_is_nudged_then_escalated(tmp):
     gh = FakeGitHub(FILES, [job(1, LOG_TEST)])
     llm = ScriptedLLM([AIMessage(content="I think it is a test."),
